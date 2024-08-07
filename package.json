@@ -1,7 +1,7 @@
 {
-  "name": "itach",
+  "name": "gc-unified-lib",
   "version": "2.0.1",
-  "description": "Simple Node.js module to send commands to GlobalCache iTach devices. Should handle reconnection (if connection lost), resending (on busyIR), etc.. but not abstract away the iTach API.",
+  "description": "Simple Node.js module to send commands to GlobalCache devices supporting the Unified TCP API. Should handle reconnection (if connection lost), resending (on busyIR), etc.. but not abstract away the Unified TCP API.",
   "main": "src/itach.js",
   "scripts": {
     "lint": "prettier --write --check \"./{src,test}/**/*.js\"",
@@ -9,7 +9,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/tillbaks/node-itach"
+    "url": "https://github.com/zehnm/gc-unified-lib"
   },
   "keywords": [
     "node",
@@ -23,7 +23,7 @@
   ],
   "license": "MIT License",
   "bugs": {
-    "url": "https://github.com/tillbaks/node-itach/issues"
+    "url": "https://github.com/zehnm/gc-unified-lib/issues"
   },
   "devDependencies": {
     "ava": "^3.14.0",
