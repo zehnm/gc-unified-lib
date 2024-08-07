@@ -14,13 +14,13 @@ npm install https://github.com/zehnm/gc-unified-lib.git
 ## Example
 
 ```js
-const { UnifiedClient } = require("itach");
+const { UnifiedClient } = require("gc-unified-lib");
 const client = new UnifiedClient();
 
 client.on("connect", async () => {
     console.log("Connected to itach");
     try {
-        const result = await itach.send("sendir:..")
+        const result = await client.send("sendir:..")
     } catch (error) {
         // Some error happened
     }
