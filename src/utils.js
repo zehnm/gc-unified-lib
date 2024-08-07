@@ -63,6 +63,14 @@ const createQueue = (taskFunc, concurrency = 1) => {
     resume: () => {
       paused = false;
       run();
+    },
+    clear: () => {
+      let queueItem;
+      while (typeof (queueItem = queue.shift()) !== "undefined") {
+        console.debug("Removing queue item:", queueItem);
+        queueItem.reject(new Error("Clearing queue"));
+      }
+      queue.length = 0;
     }
   };
 };

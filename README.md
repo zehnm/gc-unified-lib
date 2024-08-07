@@ -14,9 +14,10 @@ npm install https://github.com/zehnm/gc-unified-lib.git
 ## Example
 
 ```js
-var itach = require("itach");
+const { UnifiedClient } = require("itach");
+const client = new UnifiedClient();
 
-itach.on("connect", async () => {
+client.on("connect", async () => {
     console.log("Connected to itach");
     try {
         const result = await itach.send("sendir:..")
@@ -25,7 +26,7 @@ itach.on("connect", async () => {
     }
 });
 
-itach.connect({host: "itach", reconnect: true});
+client.connect({host: "itach", reconnect: true});
 ```
 
 ## API
@@ -55,7 +56,7 @@ _Arguments_
 _Examples_
 
 ```js
-itach.setOptions({host: "itachIP2IR", reconnect: true});
+client.setOptions({host: "itachIP2IR", reconnect: true});
 ```
 
 ---------------------------------------
@@ -71,11 +72,11 @@ _Arguments_
 _Examples_
 
 ```js
-itach.connect();
+client.connect();
 ```
 
 ```js
-itach.connect({host: "itachIP2IR", reconnect: true});
+client.connect({host: "itachIP2IR", reconnect: true});
 ```
 
 ---------------------------------------
@@ -89,11 +90,11 @@ Also note: You can change any options.
 _Example_
 
 ```js
-itach.close();
+client.close();
 ```
 
 ```js
-itach.close({reconnect: false});
+client.close({reconnect: false});
 ```
 
 ---------------------------------------
@@ -114,7 +115,7 @@ _Example_
 
 ```js
 try {
-    const result = await itach.send('sendir,1:1,1,38400,1,1,347,173,22,22,22,65,22,22,22,22,22,65,22,22,22,22,22,22,22,22,22,22,22,65,22,22,22,65,22,65,22,22,22,22,22,22,22,22,22,65,22,22,22,22,22,22,22,22,22,22,22,65,22,65,22,22,22,65,22,65,22,65,22,65,22,65,22,1657')
+    const result = await client.send('sendir,1:1,1,38400,1,1,347,173,22,22,22,65,22,22,22,22,22,65,22,22,22,22,22,22,22,22,22,22,22,65,22,22,22,65,22,65,22,22,22,22,22,22,22,22,22,65,22,22,22,22,22,22,22,22,22,22,22,65,22,65,22,22,22,65,22,65,22,65,22,65,22,65,22,1657')
     console.log(result) // completeir...
 } catch (error) {
     // handle error
@@ -132,15 +133,15 @@ __Events__
 _Example_
 
 ```js
-itach.on("connect", function () {
+client.on("connect", function () {
     // Connection established
 });
 
-itach.on("close", function () {
+client.on("close", function () {
     // Connection closed
 });
 
-itach.on("error", function (error) {
+client.on("error", function (error) {
     // Error occurred
 });
 ```
@@ -149,10 +150,8 @@ itach.on("error", function (error) {
 
 - Enhance reconnection logic:
     - Add backoff reconnection interval.
-    - Auto-reconnect if connection is dropped after connection has been established.
 - Keep-alive option.
 - Rename itach module, goal is to support the complete product family.
-- Multi-device connectivity: allow multiple instances to different devices.
 
 ## Links
 
