@@ -2,6 +2,8 @@ const test = require("ava");
 const sinon = require("sinon");
 const itach = require("../");
 
+const NON_EXISTING_IP = "192.168.9.234"
+
 test.beforeEach.cb((t) => {
   itach.setOptions({
     host: "192.168.1.25",
@@ -25,7 +27,8 @@ test.afterEach.cb((t) => {
   }, 1000);
 });
 
-test.serial.cb("can connect to itach device", (t) => {
+// TODO Not suitable as a unit test, requires real device. Separate as integration test.
+test.serial.skip("can connect to itach device", (t) => {
   t.plan(1);
 
   const connectFunc = sinon.spy();
@@ -50,7 +53,7 @@ test.serial.cb("connection times out", (t) => {
   itach.on("error", errorFunc);
 
   itach.connect({
-    host: "192.168.1.222",
+    host: NON_EXISTING_IP,
     connectionTimeout: 100,
     reconnect: false,
   });
@@ -63,6 +66,7 @@ test.serial.cb("connection times out", (t) => {
   }, 10000);
 });
 
+// TODO test doesn't always work, just hangs forever after reconnect attempt
 test.serial.cb("reconnects after connection times out", (t) => {
   t.plan(3);
 
@@ -72,7 +76,7 @@ test.serial.cb("reconnects after connection times out", (t) => {
   itach.on("connect", connectFunc);
   itach.on("error", errorFunc);
 
-  itach.connect({ host: "192.168.1.222", connectionTimeout: 100 });
+  itach.connect({ host: NON_EXISTING_IP, connectionTimeout: 100 });
 
   setTimeout(() => {
     t.is(connectFunc.callCount, 0);
@@ -82,7 +86,8 @@ test.serial.cb("reconnects after connection times out", (t) => {
   }, 10000);
 });
 
-test.serial.cb("sending sendir commands", (t) => {
+// TODO Not suitable as a unit test, requires real device. Separate as integration test.
+test.serial.skip("sending sendir commands", (t) => {
   t.plan(1);
 
   itach.connect();
@@ -96,7 +101,8 @@ test.serial.cb("sending sendir commands", (t) => {
   });
 });
 
-test.serial.cb("error when sending invalid sendir commands", (t) => {
+// TODO Not suitable as a unit test, requires real device. Separate as integration test.
+test.serial.skip("error when sending invalid sendir commands", (t) => {
   t.plan(2);
 
   itach.connect();
