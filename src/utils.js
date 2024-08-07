@@ -1,3 +1,5 @@
+const { ERRORCODES } = require("./config");
+
 /**
  * Rejects a passed promise if it hasn't completed in time
  *
@@ -65,4 +67,42 @@ const createQueue = (taskFunc, concurrency = 1) => {
   };
 };
 
-module.exports = { createQueue };
+/**
+ * Check if a Global Caché response message is an error response.
+ *
+ * @param response the response message.
+ * @param responseEndIndex end index of the response message.
+ * @throws Error is thrown in case of an error response.
+ */
+function checkErrorResponse(response, responseEndIndex) {
+  if (response.startsWith("ERR_")) {
+    // handle iTach errors
+    const errorCode = response.substring(responseEndIndex - 3, responseEndIndex);
+    const msg = ERRORCODES[errorCode];
+    if (msg === undefined) {
+      throw new Error(response.trim());
+    } else {
+      throw new Error(`${msg} (${response.trim()})`);
+    }
+  } else if (response.startsWith("ERR ")) {
+    // handle Flex & Global Connect errors
+    const errorCode = response.trim();
+    const msg = ERRORCODES[errorCode];
+    if (msg === undefined) {
+      throw new Error(errorCode);
+    } else {
+      throw new Error(`${msg} (${response.trim()})`);
+    }
+  } else if (response.startsWith("unknowncommand")) {
+    // handle GC-100 errors
+    const errorCode = response.trim();
+    const msg = ERRORCODES[errorCode];
+    if (msg === undefined) {
+      throw new Error(errorCode);
+    } else {
+      throw new Error(`${msg} (${response.substring(14).trim()})`);
+    }
+  }
+}
+
+module.exports = { createQueue, checkErrorResponse };

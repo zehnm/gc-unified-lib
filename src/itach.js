@@ -1,8 +1,8 @@
 const net = require("net");
 const { EventEmitter } = require("events");
 const itach = new EventEmitter();
-const { options, ERRORCODES } = require("./config");
-const { createQueue } = require("./utils");
+const { options } = require("./config");
+const { createQueue, checkErrorResponse } = require("./utils");
 let socket, reconnectionTimer;
 
 const queue = createQueue(
@@ -13,12 +13,18 @@ const queue = createQueue(
       socket.on("data", (data) => {
         response += data;
         const responseEndIndex = response.lastIndexOf("\r");
-        if (responseEndIndex === -1) return; // Message not finished
+        if (responseEndIndex === -1) {
+          return; // Message not finished
+        }
 
-        if (response.startsWith("ERR_")) {
-          const errorCode = response.substring(responseEndIndex - 3, responseEndIndex);
-          reject(new Error(ERRORCODES[errorCode]));
-        } else if (response.startsWith("busyIR")) {
+        try {
+          checkErrorResponse(response, responseEndIndex);
+        } catch (e) {
+          reject(e);
+          return;
+        }
+
+        if (response.startsWith("busyIR")) {
           setTimeout(() => socket.write(message), options.retryInterval);
         } else {
           resolve(response.substring(0, responseEndIndex));

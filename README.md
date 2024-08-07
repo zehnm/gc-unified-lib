@@ -152,7 +152,6 @@ itach.on("error", function (error) {
     - Add backoff reconnection interval.
 - Auto-reconnect if connection is dropped after connection has been established.
 - Device discovery.
-- Handle error codes of non-iTach devices.
 - Keep-alive option.
 - Rename itach module, goal is to support the complete product family.
 - Multi-device connectivity: allow multiple instances to different devices.
