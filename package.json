@@ -4,7 +4,8 @@
   "description": "Simple Node.js module to send commands to GlobalCache devices supporting the Unified TCP API. Should handle reconnection (if connection lost), resending (on busyIR), etc.. but not abstract away the Unified TCP API.",
   "main": "src/itach.js",
   "scripts": {
-    "lint": "prettier --write --check \"./{src,test}/**/*.js\"",
+    "format": "prettier --write \"./{src,test}/**/*.js\"",
+    "lint": "prettier --check \"./{src,test}/**/*.js\" && eslint . --ext .js",
     "test": "ava"
   },
   "repository": {
@@ -28,6 +29,11 @@
   "devDependencies": {
     "ava": "^6.1.3",
     "sinon": "^18.0.0",
-    "prettier": "^2.2.1"
+    "prettier": "^3.3.3",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "9.1.0",
+    "eslint-config-semistandard": "^17.0.0",
+    "eslint-plugin-prettier": "5.2.1",
+    "eslint-plugin-promise": "^6.6.0"
   }
 }

@@ -14,7 +14,7 @@ const timeoutPromise = ({ promise, timeout, error }) => {
     promise.then((value) => {
       clearTimeout(timer);
       return value;
-    }),
+    })
   ]);
 };
 
@@ -35,9 +35,7 @@ const createQueue = (taskFunc, concurrency = 1) => {
           timeoutPromise({
             promise: taskFunc(queueItem.task),
             timeout: queueItem.timeout,
-            error: new Error(
-              "QueueTaskTimeout: Task failed to complete before timeout was reached."
-            ),
+            error: new Error("QueueTaskTimeout: Task failed to complete before timeout was reached.")
           })
         );
       } else {
@@ -63,7 +61,7 @@ const createQueue = (taskFunc, concurrency = 1) => {
     resume: () => {
       paused = false;
       run();
-    },
+    }
   };
 };
 

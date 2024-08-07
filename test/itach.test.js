@@ -2,9 +2,9 @@ const test = require("ava");
 const sinon = require("sinon");
 const itach = require("../");
 
-const NON_EXISTING_IP = "192.168.9.234"
+const NON_EXISTING_IP = "192.168.9.234";
 
-test.beforeEach(t => {
+test.beforeEach((t) => {
   itach.removeAllListeners();
   itach.setOptions({
     host: "192.168.1.25",
@@ -13,13 +13,13 @@ test.beforeEach(t => {
     reconnectSleep: 1000,
     sendTimeout: 500,
     retryInterval: 99,
-    connectionTimeout: 3000,
+    connectionTimeout: 3000
   });
   // t.deepEqual(itach.eventNames(), []);
   itach.on("error", console.log);
 });
 
-test.afterEach(t => {
+test.afterEach((t) => {
   itach.close({ reconnect: false });
 });
 
@@ -38,7 +38,7 @@ test.serial.skip("can connect to itach device", async (t) => {
       t.is(connectFunc.callCount, 1);
       resolve();
     }, 5000);
-  })
+  });
 });
 
 test.serial("connection times out", async (t) => {
@@ -53,7 +53,7 @@ test.serial("connection times out", async (t) => {
   itach.connect({
     host: NON_EXISTING_IP,
     connectionTimeout: 100,
-    reconnect: false,
+    reconnect: false
   });
 
   await new Promise((resolve, reject) => {
@@ -64,7 +64,7 @@ test.serial("connection times out", async (t) => {
       t.true(msg === "Connection timeout." || msg.startsWith("Error: connect EHOSTUNREACH"));
       resolve();
     }, 5000);
-  })
+  });
 });
 
 // TODO test doesn't always work, just hangs forever after reconnect attempt
@@ -87,7 +87,7 @@ test.serial("reconnects after connection times out", async (t) => {
       t.true(msg === "Connection timeout." || msg.startsWith("Error: connect EHOSTUNREACH"));
       resolve();
     }, 5000);
-  })
+  });
 });
 
 // TODO Not suitable as a unit test, requires real device. Separate as integration test.
@@ -112,7 +112,7 @@ test.serial.skip("error when sending invalid sendir commands", (t) => {
 
   itach.on("connect", async () => {
     const error = await t.throwsAsync(itach.send("sendir:"), {
-      instanceOf: Error,
+      instanceOf: Error
     });
     t.is(error.message, "Invalid command. Command not found.");
   });
@@ -126,9 +126,6 @@ test.serial.skip("error when sendtimeout reached", (t) => {
 
   itach.on("connect", async () => {
     const error = await t.throws(itach.send("getdevices"), Error);
-    t.is(
-      error.message,
-      "QueueTaskTimeout: Task failed to complete before timeout was reached."
-    );
+    t.is(error.message, "QueueTaskTimeout: Task failed to complete before timeout was reached.");
   });
 });

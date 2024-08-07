@@ -56,10 +56,7 @@ itach.connect = (opts) => {
       socket.destroy("Connection timeout.");
       if (options.reconnect) {
         if (reconnectionTimer) clearTimeout(reconnectionTimer);
-        reconnectionTimer = setTimeout(
-          itach.connect,
-          options.reconnectInterval
-        );
+        reconnectionTimer = setTimeout(itach.connect, options.reconnectInterval);
       }
     });
   }, options.connectionTimeout);
@@ -89,10 +86,7 @@ itach.connect = (opts) => {
 };
 
 itach.send = (data) => {
-  return queue.push(
-    data.endsWith("\r") ? data : data + "\r",
-    options.sendTimeout
-  );
+  return queue.push(data.endsWith("\r") ? data : data + "\r", options.sendTimeout);
 };
 
 module.exports = itach;
