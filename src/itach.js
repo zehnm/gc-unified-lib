@@ -17,6 +17,11 @@ const queue = createQueue(
           return; // Message not finished
         }
 
+        // multiline response with multiple \r!
+        if (response.startsWith("device,") && !response.endsWith("endlistdevices\r")) {
+          return; // Message not finished
+        }
+
         try {
           checkErrorResponse(response, responseEndIndex);
         } catch (e) {
