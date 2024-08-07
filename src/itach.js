@@ -5,6 +5,8 @@ const { options } = require("./config");
 const { createQueue, checkErrorResponse } = require("./utils");
 let socket, reconnectionTimer;
 
+let connected = false;
+
 const queue = createQueue(
   (message) =>
     new Promise((resolve, reject) => {
@@ -43,7 +45,9 @@ const queue = createQueue(
 queue.pause();
 
 itach.setOptions = (opts) => {
-  if (opts === undefined) return;
+  if (opts === undefined) {
+    return;
+  }
   Object.entries(opts).forEach(([key, value]) => {
     options[key] = value;
   });
@@ -53,20 +57,36 @@ itach.close = (opts) => {
   itach.setOptions(opts);
   queue.pause();
   socket.destroy();
+  connected = false;
   if (options.reconnect) {
-    if (reconnectionTimer) clearTimeout(reconnectionTimer);
+    if (reconnectionTimer) {
+      clearTimeout(reconnectionTimer);
+    }
     reconnectionTimer = setTimeout(itach.connect, options.reconnectInterval);
   }
 };
 
+/**
+ * Connects to a device and optionally changes options before connecting.
+ *
+ * @param {Object} opts An options Object (see setOptions method)
+ * @return {boolean} false if already connected, true if connection has started.
+ */
 itach.connect = (opts) => {
+  if (connected || (socket && socket.readyState === "opening")) {
+    console.debug("Already connected or connecting, socket state:", socket ? socket.readyState : "none");
+    return false;
+  }
+
   itach.setOptions(opts);
 
   const connectionTimeout = setTimeout(() => {
     setImmediate(() => {
       socket.destroy("Connection timeout.");
+      if (reconnectionTimer) {
+        clearTimeout(reconnectionTimer);
+      }
       if (options.reconnect) {
-        if (reconnectionTimer) clearTimeout(reconnectionTimer);
         reconnectionTimer = setTimeout(itach.connect, options.reconnectInterval);
       }
     });
@@ -77,12 +97,14 @@ itach.connect = (opts) => {
     socket.setEncoding("utf8");
 
     socket.on("connect", () => {
+      connected = true;
       clearTimeout(connectionTimeout);
       queue.resume();
       itach.emit("connect");
     });
 
     socket.on("close", () => {
+      connected = false;
       queue.pause();
       itach.emit("close");
     });
@@ -91,9 +113,11 @@ itach.connect = (opts) => {
       queue.pause();
       itach.emit("error", new Error(error));
     });
-  } else if (socket.remoteAddress === undefined) {
+  } else {
     socket.connect({ host: options.host, port: options.port });
   }
+
+  return true;
 };
 
 itach.send = (data) => {

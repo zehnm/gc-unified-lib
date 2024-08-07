@@ -147,10 +147,9 @@ itach.on("error", function (error) {
 
 ## TODO
 
-- Fix and enhance reconnection logic:
-    - Fix reconnection loop.
+- Enhance reconnection logic:
     - Add backoff reconnection interval.
-- Auto-reconnect if connection is dropped after connection has been established.
+    - Auto-reconnect if connection is dropped after connection has been established.
 - Device discovery.
 - Keep-alive option.
 - Rename itach module, goal is to support the complete product family.
