@@ -3,7 +3,7 @@
 Simple Node.js module to send commands to Global Caché devices supporting the Unified TCP API. Should handle
 reconnection (if connection lost), resending (on busyIR), etc.. but not abstract away the Unified TCP API.
 
-Note: Only testing with IP2IR device, but it should work with any of the Global Caché product family devices.
+Note: Only tested with GC-100-12 and IP2IR devices, but it should work with any of the Global Caché product family devices.
 
 ## Installation
 
@@ -150,7 +150,6 @@ itach.on("error", function (error) {
 - Enhance reconnection logic:
     - Add backoff reconnection interval.
     - Auto-reconnect if connection is dropped after connection has been established.
-- Device discovery.
 - Keep-alive option.
 - Rename itach module, goal is to support the complete product family.
 - Multi-device connectivity: allow multiple instances to different devices.
