@@ -15,7 +15,11 @@ class UnifiedClient extends EventEmitter {
 
   constructor(options = undefined) {
     super();
-    this.#options = options === undefined ? defaultOptions : options;
+    // copy is required, otherwise different instances share the same object reference!
+    // shallow copy is sufficient for the options object
+    this.#options = { ...defaultOptions };
+    // overlay custom options
+    this.setOptions(options);
     this.#queue = createQueue(
       (message) =>
         new Promise((resolve, reject) => {
