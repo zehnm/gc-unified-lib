@@ -73,7 +73,9 @@ class UnifiedClient extends EventEmitter {
     this.setOptions(opts);
     this.#queue.pause();
     this.#queue.clear();
-    this.#socket.destroy();
+    if (this.#socket) {
+      this.#socket.destroy();
+    }
     this.#connected = false;
     if (this.#connectionTimer) {
       clearTimeout(this.#connectionTimer);
