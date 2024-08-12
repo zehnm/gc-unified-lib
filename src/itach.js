@@ -11,7 +11,7 @@ class UnifiedClient extends EventEmitter {
   #socket;
   #connectionTimer;
   #reconnectionTimer;
-  #currentReconnectInterval = defaultOptions.reconnectIntervall;
+  #currentReconnectInterval = defaultOptions.reconnectInterval;
   #connected = false;
 
   constructor(options = undefined) {
