@@ -4,21 +4,21 @@ const { discover } = require("./discover");
 const { options: defaultOptions } = require("./config");
 const { createQueue, checkErrorResponse } = require("./utils");
 const { ProductFamily, productFamilyFromVersion, modelFromVersion, retrieveDeviceInfo } = require("./models");
+const ReconnectingSocket = require("reconnecting-socket");
 
 class UnifiedClient extends EventEmitter {
-  #options;
+  // copy is required, otherwise different instances share the same object reference!
+  // shallow copy is sufficient for the options object
+  #options = { ...defaultOptions };
   #queue;
-  #socket;
+  #socket = new net.Socket();
+  #reconnectingTCP;
   #connectionTimer;
   #reconnectionTimer;
   #currentReconnectInterval = defaultOptions.reconnectInterval;
-  #connected = false;
 
   constructor(options = undefined) {
     super();
-    // copy is required, otherwise different instances share the same object reference!
-    // shallow copy is sufficient for the options object
-    this.#options = { ...defaultOptions };
     // overlay custom options
     this.setOptions(options);
     this.#queue = createQueue(
@@ -59,6 +59,106 @@ class UnifiedClient extends EventEmitter {
       1
     );
     this.#queue.pause();
+
+    this.#socket.setEncoding("utf8");
+
+    const that = this;
+    this.#reconnectingTCP = new ReconnectingSocket({
+      backoff: {
+        initialDelay: this.#options.reconnectInterval,
+        maxDelay: this.#options.reconnectIntervalMax
+      },
+      create() {
+        // since the socket is reused, remove all old listeners from last connection attempt
+        that.#socket.removeAllListeners("close");
+        that.#socket.removeAllListeners("error");
+        that.#socket.removeAllListeners("connect");
+        // Indicate the socket is exhausted/failed/done.
+        that.#socket.once("close", this.close);
+        // Capture errors.  The last one will be available in `onfail`
+        that.#socket.once("error", this.error);
+        // Notify the socket is open/connected/ready for use
+        that.#socket.once("connect", this.open);
+
+        // Attention: ReconnectingSocket only acts on the wrapped Socket and doesn't bring its own connection timeout function!
+        // EHOSTDOWN or EHOSTUNREACH errors might take 30s or more. This is system dependent.
+        if (that.#connectionTimer) {
+          clearTimeout(that.#connectionTimer);
+        }
+        that.#connectionTimer = setTimeout(() => {
+          setImmediate(() => {
+            console.debug("Connection timeout");
+            that.#socket.destroy(
+              // TODO custom error / error code Error: read ETIMEDOUT
+              new Error(
+                `Connection timeout to ${that.#options.host}:${that.#options.port} (${that.#options.connectionTimeout}ms).`
+              )
+            );
+          });
+        }, that.#options.connectionTimeout);
+
+        // Node.js bug? keepAlive and keepAliveInitialDelay options should be supported with connect() options in Node.js > v16.50.0,
+        // but doesn't work with v22.2.0!
+        // However, using setKeepAlive works fine...
+        that.#socket.setKeepAlive(that.#options.tcpKeepAlive, that.#options.tcpKeepAliveInitialDelay);
+        that.#socket.connect({
+          host: that.#options.host,
+          port: that.#options.port
+        });
+
+        return that.#socket;
+      },
+      destroy(socket) {
+        console.debug("ReconnectingSocket callback: destroy");
+        // Clean up and stop a socket when reconnectingTCP.stop() is called
+        socket.destroy();
+      },
+      onopen(socket, firstOpen) {
+        console.debug("ReconnectingSocket callback: onopen, first:", firstOpen);
+        // remove connection timer
+        if (that.#connectionTimer) {
+          clearTimeout(that.#connectionTimer);
+          that.#connectionTimer = undefined;
+        }
+
+        // auto-reconnect if connection drops
+        that.#socket.on("error", (error) => {
+          that.#queue.pause();
+          that.emit("error", error);
+
+          // socket.once("error", (e) => {
+          console.error("Connection dropped! Start reconnection in %dms", that.#options.reconnectInterval, error);
+          that.#reconnectionTimer = setTimeout(that.connect.bind(that), that.#options.reconnectInterval);
+        });
+
+        // ready to send any pending requests
+        that.#queue.resume();
+        that.emit("connect");
+      },
+      onclose(socket) {
+        console.debug("ReconnectingSocket callback: onclose");
+        // Remove event listeners, stop intervals etc.
+        if (that.#connectionTimer) {
+          clearTimeout(that.#connectionTimer);
+          that.#connectionTimer = undefined;
+        }
+        that.#queue.pause();
+        that.emit("close");
+      },
+      onfail(err) {
+        console.error("ReconnectingSocket error", err);
+        // Handle the final error that was emitted that caused retry to stop.
+        that.#queue.pause();
+        that.emit("error", err);
+      }
+    });
+
+    this.#reconnectingTCP.on("info", (msg) => {
+      console.info("Socket:", msg);
+    });
+    this.#reconnectingTCP.on("state", (state) => {
+      console.info("Socket state:", state);
+    });
   }
 
   setOptions(opts) {
@@ -75,118 +175,41 @@ class UnifiedClient extends EventEmitter {
     this.setOptions(opts);
     this.#queue.pause();
     this.#queue.clear();
-    if (this.#socket) {
-      this.#socket.destroy();
-    }
-    this.#connected = false;
+
     if (this.#connectionTimer) {
       clearTimeout(this.#connectionTimer);
+      this.#connectionTimer = undefined;
     }
     if (this.#reconnectionTimer) {
       clearTimeout(this.#reconnectionTimer);
+      this.#reconnectionTimer = undefined;
     }
+
+    this.#reconnectingTCP.stop();
+
+    /*
     // TODO does this make sense to auto-reconnect after a manual close?
     if (this.#options.reconnect) {
       this.#reconnectionTimer = setTimeout(this.connect.bind(this), this.#options.reconnectInterval);
     }
+     */
   }
 
   /**
    * Connects to a device and optionally changes options before connecting.
    *
    * @param {Object} opts An options Object (see setOptions method)
-   * @return {boolean} false if already connected, true if connection has started.
    */
   connect(opts) {
-    if (this.#connected || (this.#socket && this.#socket.readyState === "opening")) {
-      console.debug("Already connected or connecting, socket state:", this.#socket ? this.#socket.readyState : "none");
-      return false;
-    }
-
     this.setOptions(opts);
-    this.#connected = false;
-
-    console.debug(
-      "Connecting %s:%s (readyState=%s)",
-      this.#options.host,
-      this.#options.port,
-      this.#socket ? this.#socket.readyState : ""
-    );
-
-    if (this.#connectionTimer) {
-      clearTimeout(this.#connectionTimer);
-    }
-    this.#connectionTimer = setTimeout(() => {
-      setImmediate(() => {
-        console.debug("Connection timeout");
-        this.#socket.destroy(
-          new Error(
-            `Connection timeout to ${this.#options.host}:${this.#options.port} (${this.#options.connectionTimeout}ms).`
-          )
-        );
-
-        if (this.#reconnectionTimer) {
-          console.debug("clearTimeout reconnectTimer");
-          clearTimeout(this.#reconnectionTimer);
-        }
-
-        if (this.#options.reconnect) {
-          console.debug("Start reconnection in", this.#currentReconnectInterval);
-          this.#reconnectionTimer = setTimeout(this.connect.bind(this), this.#currentReconnectInterval);
-          this._recalculateReconnectInterval();
-        }
-      });
-    }, this.#options.connectionTimeout);
-
-    if (this.#socket === undefined) {
-      this.#socket = net.connect({
-        host: this.#options.host,
-        port: this.#options.port,
-        keepAlive: this.#options.tcpKeepAlive,
-        keepAliveInitialDelay: this.#options.tcpKeepAliveInitialDelay
-      });
-      this.#socket.setEncoding("utf8");
-
-      this.#socket.on("connect", () => {
-        this.#connected = true;
-        clearTimeout(this.#connectionTimer);
-        // reset connection interval when using backoff factor
-        this.#currentReconnectInterval = this.#options.reconnectInterval;
-        this.#queue.resume();
-        this.emit("connect");
-      });
-
-      this.#socket.on("close", () => {
-        this.#connected = false;
-        this.#queue.pause();
-        this.emit("close");
-      });
-
-      this.#socket.on("error", (error) => {
-        this.#queue.pause();
-        this.emit("error", error);
-
-        if (this.#connected && this.#options.reconnect) {
-          // for a regular connection drop, don't use backoff factor (this is only used to establish the connection)
-          console.debug("Start reconnection in", this.#options.reconnectInterval);
-          this.#reconnectionTimer = setTimeout(this.connect.bind(this), this.#options.reconnectInterval);
-        }
-      });
-    } else {
-      // TODO further tests with keep-alive, might not work with GC-100
-      this.#socket.connect({
-        host: this.#options.host,
-        port: this.#options.port,
-        keepAlive: this.#options.tcpKeepAlive,
-        keepAliveInitialDelay: this.#options.tcpKeepAliveInitialDelay
-      });
-    }
-
-    return true;
+    this.#reconnectingTCP.start();
   }
 
   send(data) {
     return this.#queue.push(data.endsWith("\r") ? data : data + "\r", this.#options.sendTimeout);
+  }
+  raw(data) {
+    this.#socket.write(data);
   }
 
   async getDevices() {
