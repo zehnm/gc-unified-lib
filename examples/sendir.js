@@ -4,7 +4,7 @@ const { UnifiedClient } = require("../src/itach");
 const client = new UnifiedClient();
 
 client.on("connect", async () => {
-  console.debug("Connected to device");
+  console.debug("[sendir] Connected to device");
   try {
     console.info("Version:", await client.send("getversion"));
     // console.log(await send("getdevices"));
@@ -13,18 +13,23 @@ client.on("connect", async () => {
     const cmd = 'sendir,1:1,1,38000,1,69,340,169,20,20,20,20,20,64,20,20,20,20,20,20,20,20,20,20,20,64,20,64,20,20,20,64,20,64,20,64,20,64,20,64,20,20,20,64,20,64,20,64,20,20,20,20,20,20,20,20,20,64,20,20,20,20,20,20,20,64,20,64,20,64,20,64,20,1544,340,85,20,3663';
     console.info("irsend :", await client.send(cmd));
   } catch (error) {
-    console.error("Failed to send a command.", error)
+    console.error("[sendir] Failed to send a command.", error)
   }
 
-  client.close({ reconnect: false })
+  console.info("Keeping connection open. You can disconnect the network to test the reconnection function!")
+  // client.close({ reconnect: false })
 });
 
 client.on("close", () => {
-  console.info("Connection closed.");
+  console.info("[sendir] Connection closed.");
 })
 
 client.on("error", (e) => {
-  console.error("Failed to connect to device.", e);
+  console.error("[sendir]", e);
 })
 
-client.connect({ host: "172.16.16.127", reconnect: true });
+client.on("state", (state) => {
+  console.debug("[sendir] connection state change:", state);
+})
+
+client.connect({ host: "172.16.16.127", reconnect: true, tcpKeepAlive: true, tcpKeepAliveInitialDelay: 10000 });

@@ -1,7 +1,7 @@
 # gc-unified-lib
 
 Simple Node.js module to send commands to Global Caché devices supporting the Unified TCP API. Should handle
-reconnection (if connection lost), resending (on busyIR), etc.. but not abstract away the Unified TCP API.
+reconnection (if connection lost), resending (on busyIR), etc., but not abstract away the Unified TCP API.
 
 Note: Only tested with GC-100-12 and IP2IR devices, but it should work with any of the Global Caché product family devices.
 
@@ -26,7 +26,7 @@ client.on("connect", async () => {
     }
 });
 
-client.connect({host: "itach", reconnect: true});
+client.connect({host: "192.168.1.234", reconnect: true});
 ```
 
 ## API
@@ -47,15 +47,27 @@ _Arguments_
     - `options.host` - (Default: null) Hostname/IP to connect to
     - `options.port` - (Default: 4998) Port to connect to
     - `options.reconnect` - (Default: false) Try to reconnect if connection is lost
-    - `options.reconnectInterval` - (Default: 3000) Time (in milliseconds) between reconnection attempts
-    - `options.reconnectIntervalMax` - (Default: 10000) Maximum time (in milliseconds) between reconnection attempts when using a `reconnectBackoffFactor`
-    - `options.reconnectBackoffFactor` - (Default: 1.5) Increase `reconnectIntervall` duration by the specified factor until `reconnectIntervalMax` is reached.
+    - `options.backoff` - backoff options from [MathieuTurcotte/node-backoff](https://github.com/MathieuTurcotte/node-backoff#readme).  
+       Default:
+      ```js
+      {
+        strategy: "fibonacci",
+        randomisationFactor: 0,
+        initialDelay: 500,
+        maxDelay: 10000,
+        failAfter: null
+      }
+      ```
     - `options.connectionTimeout` - (Default: 3000) Timeout (in milliseconds) when connection attempt is assumed to be
       failed. error event will be emitted.
+    - `options.reconnectDelay` - (Default: 200) Delay (in milliseconds) for initial reconnection attempt if a connection has been dropped after connection has been established. 
     - `options.retryInterval`- (Default: 99) Time (in milliseconds) between resending attempts (when busyIR is received)
     - `options.sendTimeout` - (Default: 500) Time (in milliseconds) after which a sent command will be assumed lost
     - `options.tcpKeepAlive` - (Default: false) Enable/ disable the native TCP keep-alive functionality
     - `options.tcpKeepAliveInitialDelay` - (Default: 30000) Set the delay in milliseconds between the last data packet received and the first keepalive probe. Setting 0 will leave the value unchanged from the default (or previous) setting.
+
+⚠️ `options.backoff` can only be set in the `UnifiedClient()` constructor and has no effect in the `setOptions`,
+   `connect()` and `close()` calls! 
 
 _Examples_
 
@@ -130,6 +142,7 @@ try {
 
 __Events__
 
+- `state` - Connection state events: `stopped`, `opening`, `opened`, `closing`, `closed`, `reopening`, `failed`, `connectionTimeout`.
 - `connect` - Connection to device has been established and commands will now be sent
 - `close` - Connection to device has been closed
 - `error` - Some error with the socket connection
@@ -137,6 +150,10 @@ __Events__
 _Example_
 
 ```js
+client.on("state", function (state) {
+  log.debug("Connection state change:", state);
+});
+
 client.on("connect", function () {
     // Connection established
 });

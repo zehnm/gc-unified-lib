@@ -6,19 +6,17 @@ const NON_EXISTING_IP = "192.168.9.234";
 const client = new UnifiedClient();
 
 test.beforeEach((t) => {
+  client.close();
   client.removeAllListeners();
   client.setOptions({
     host: "192.168.1.25",
     port: 4998,
     reconnect: true,
-    reconnectSleep: 1000,
     sendTimeout: 500,
     retryInterval: 99,
     connectionTimeout: 3000,
-    reconnectInterval: 3000,
-    reconnectBackoffFactor: 1
+    reconnectDelay: 3000
   });
-  // t.deepEqual(client.eventNames(), []);
   client.on("error", console.log);
 });
 
@@ -61,21 +59,25 @@ test.serial("connection times out", async (t) => {
 
   await new Promise((resolve, reject) => {
     setTimeout(() => {
-      t.is(connectFunc.callCount, 0);
-      t.is(errorFunc.callCount, 1);
-      const err = errorFunc.getCall(0).args[0];
-      t.true(err instanceof Error, "Expected an Error object");
-      t.true(
-        err.message.startsWith("Connection timeout") || err.message.startsWith("Error: connect EHOSTUNREACH"),
-        `Got unexpected error: ${err}`
-      );
-      resolve();
+      try {
+        t.is(connectFunc.callCount, 0);
+        t.true(errorFunc.callCount >= 1);
+        const err = errorFunc.getCall(0).args[0];
+        t.true(err instanceof Error, "Expected an Error object");
+        t.true(
+          err.message.startsWith("Can't connect after") || err.code === "EHOSTUNREACH" || err.code === "EHOSTDOWN",
+          `Got unexpected error: "${err}"`
+        );
+        resolve();
+      } catch (e) {
+        reject(e);
+      }
     }, 5000);
   });
 });
 
 test.serial("reconnects after connection times out", async (t) => {
-  t.timeout(10000);
+  t.timeout(5000);
 
   const connectFunc = sinon.spy();
   const errorFunc = sinon.spy();
@@ -87,16 +89,20 @@ test.serial("reconnects after connection times out", async (t) => {
 
   await new Promise((resolve, reject) => {
     setTimeout(() => {
-      t.is(connectFunc.callCount, 0);
-      t.assert(errorFunc.callCount > 1);
-      const err = errorFunc.getCall(0).args[0];
-      t.true(err instanceof Error, "Expected an Error object");
-      t.true(
-        err.message.startsWith("Connection timeout") || err.message.startsWith("Error: connect EHOSTUNREACH"),
-        `Got unexpected error: ${err}`
-      );
-      resolve();
-    }, 5000);
+      try {
+        t.is(connectFunc.callCount, 0);
+        t.assert(errorFunc.callCount > 1);
+        const err = errorFunc.getCall(0).args[0];
+        t.true(err instanceof Error, "Expected an Error object");
+        t.true(
+          err.message.startsWith("Can't connect after") || err.code === "EHOSTUNREACH" || err.code === "EHOSTDOWN",
+          `Got unexpected error: "${err}"`
+        );
+        resolve();
+      } catch (e) {
+        reject(e);
+      }
+    }, 3000);
   });
 });
 
@@ -138,21 +144,4 @@ test.serial.skip("error when sendtimeout reached", (t) => {
     const error = await t.throws(client.send("getdevices"), Error);
     t.is(error.message, "QueueTaskTimeout: Task failed to complete before timeout was reached.");
   });
-});
-
-test("_recalculateReconnectInterval returns same interval for backoff factor 1.0", async (t) => {
-  client.setOptions({ reconnectInterval: 100, reconnectBackoffFactor: 1 });
-  t.is(client.reconnectInterval, 100, "reconnectInterval option is not applied correctly");
-
-  client._recalculateReconnectInterval();
-  t.is(client.reconnectInterval, 100, "Backoff factor 1 may not change reconnectInterval");
-});
-
-test("_recalculateReconnectInterval with factor > 1 may not go over reconnectIntervalMax", async (t) => {
-  client.setOptions({ reconnectInterval: 100, reconnectBackoffFactor: 2, reconnectIntervalMax: 300 });
-
-  for (let i = 0; i < 10; i++) {
-    client._recalculateReconnectInterval();
-  }
-  t.is(client.reconnectInterval, 300, "reconnectInterval is higher than reconnectIntervalMax");
 });

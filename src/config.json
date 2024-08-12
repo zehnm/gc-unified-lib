@@ -6,9 +6,14 @@
     "retryInterval": 99,
     "connectionTimeout": 3000,
     "reconnect": false,
-    "reconnectInterval": 200,
-    "reconnectIntervalMax": 10000,
-    "reconnectBackoffFactor": 1.5,
+    "reconnectDelay": 200,
+    "backoff": {
+      "strategy": "fibonacci",
+      "randomisationFactor": 0,
+      "initialDelay": 500,
+      "maxDelay": 10000,
+      "failAfter": null
+    },
     "tcpKeepAlive": false,
     "tcpKeepAliveInitialDelay": 0
   },
