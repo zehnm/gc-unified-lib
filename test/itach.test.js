@@ -14,7 +14,9 @@ test.beforeEach((t) => {
     reconnectSleep: 1000,
     sendTimeout: 500,
     retryInterval: 99,
-    connectionTimeout: 3000
+    connectionTimeout: 3000,
+    reconnectInterval: 3000,
+    reconnectBackoffFactor: 1
   });
   // t.deepEqual(client.eventNames(), []);
   client.on("error", console.log);
@@ -136,4 +138,21 @@ test.serial.skip("error when sendtimeout reached", (t) => {
     const error = await t.throws(client.send("getdevices"), Error);
     t.is(error.message, "QueueTaskTimeout: Task failed to complete before timeout was reached.");
   });
+});
+
+test("_recalculateReconnectInterval returns same interval for backoff factor 1.0", async (t) => {
+  client.setOptions({ reconnectInterval: 100, reconnectBackoffFactor: 1 });
+  t.is(client.reconnectInterval, 100, "reconnectInterval option is not applied correctly");
+
+  client._recalculateReconnectInterval();
+  t.is(client.reconnectInterval, 100, "Backoff factor 1 may not change reconnectInterval");
+});
+
+test("_recalculateReconnectInterval with factor > 1 may not go over reconnectIntervalMax", async (t) => {
+  client.setOptions({ reconnectInterval: 100, reconnectBackoffFactor: 2, reconnectIntervalMax: 300 });
+
+  for (let i = 0; i < 10; i++) {
+    client._recalculateReconnectInterval();
+  }
+  t.is(client.reconnectInterval, 300, "reconnectInterval is higher than reconnectIntervalMax");
 });

@@ -48,10 +48,14 @@ _Arguments_
     - `options.port` - (Default: 4998) Port to connect to
     - `options.reconnect` - (Default: false) Try to reconnect if connection is lost
     - `options.reconnectInterval` - (Default: 3000) Time (in milliseconds) between reconnection attempts
+    - `options.reconnectIntervalMax` - (Default: 10000) Maximum time (in milliseconds) between reconnection attempts when using a `reconnectBackoffFactor`
+    - `options.reconnectBackoffFactor` - (Default: 1.5) Increase `reconnectIntervall` duration by the specified factor until `reconnectIntervalMax` is reached.
     - `options.connectionTimeout` - (Default: 3000) Timeout (in milliseconds) when connection attempt is assumed to be
       failed. error event will be emitted.
     - `options.retryInterval`- (Default: 99) Time (in milliseconds) between resending attempts (when busyIR is received)
     - `options.sendTimeout` - (Default: 500) Time (in milliseconds) after which a sent command will be assumed lost
+    - `options.tcpKeepAlive` - (Default: false) Enable/ disable the native TCP keep-alive functionality
+    - `options.tcpKeepAliveInitialDelay` - (Default: 30000) Set the delay in milliseconds between the last data packet received and the first keepalive probe. Setting 0 will leave the value unchanged from the default (or previous) setting.
 
 _Examples_
 
@@ -148,9 +152,6 @@ client.on("error", function (error) {
 
 ## TODO
 
-- Enhance reconnection logic:
-    - Add backoff reconnection interval.
-- Keep-alive option.
 - Rename itach module, goal is to support the complete product family.
 
 ## Links

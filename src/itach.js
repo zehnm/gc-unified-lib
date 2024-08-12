@@ -11,6 +11,7 @@ class UnifiedClient extends EventEmitter {
   #socket;
   #connectionTimer;
   #reconnectionTimer;
+  #currentReconnectInterval = defaultOptions.reconnectIntervall;
   #connected = false;
 
   constructor(options = undefined) {
@@ -67,6 +68,7 @@ class UnifiedClient extends EventEmitter {
     Object.entries(opts).forEach(([key, value]) => {
       this.#options[key] = value;
     });
+    this.#currentReconnectInterval = this.#options.reconnectInterval;
   }
 
   close(opts) {
@@ -102,12 +104,12 @@ class UnifiedClient extends EventEmitter {
     }
 
     this.setOptions(opts);
+    this.#connected = false;
 
     console.debug(
-      "Connecting %s:%s (connected=%s, readyState=%s)",
+      "Connecting %s:%s (readyState=%s)",
       this.#options.host,
       this.#options.port,
-      this.#connected,
       this.#socket ? this.#socket.readyState : ""
     );
 
@@ -129,11 +131,9 @@ class UnifiedClient extends EventEmitter {
         }
 
         if (this.#options.reconnect) {
-          console.debug("Start reconnection in", this.#options.reconnectInterval);
-          this.#reconnectionTimer = setTimeout(
-            this.connect.bind(this),
-            this.#options.reconnectInterval // TODO backoff factor
-          );
+          console.debug("Start reconnection in", this.#currentReconnectInterval);
+          this.#reconnectionTimer = setTimeout(this.connect.bind(this), this.#currentReconnectInterval);
+          this._recalculateReconnectInterval();
         }
       });
     }, this.#options.connectionTimeout);
@@ -141,16 +141,17 @@ class UnifiedClient extends EventEmitter {
     if (this.#socket === undefined) {
       this.#socket = net.connect({
         host: this.#options.host,
-        port: this.#options.port
+        port: this.#options.port,
+        keepAlive: this.#options.tcpKeepAlive,
+        keepAliveInitialDelay: this.#options.tcpKeepAliveInitialDelay
       });
       this.#socket.setEncoding("utf8");
-      // TODO further tests with keep-alive, might not work with GC-100
-      this.#socket.setKeepAlive(true, 30000);
 
       this.#socket.on("connect", () => {
         this.#connected = true;
         clearTimeout(this.#connectionTimer);
-        // TODO reset connection interval when using backoff factor
+        // reset connection interval when using backoff factor
+        this.#currentReconnectInterval = this.#options.reconnectInterval;
         this.#queue.resume();
         this.emit("connect");
       });
@@ -165,17 +166,20 @@ class UnifiedClient extends EventEmitter {
         this.#queue.pause();
         this.emit("error", error);
 
-        if (this.#options.reconnect) {
+        if (this.#connected && this.#options.reconnect) {
+          // for a regular connection drop, don't use backoff factor (this is only used to establish the connection)
           console.debug("Start reconnection in", this.#options.reconnectInterval);
-          this.#reconnectionTimer = setTimeout(
-            this.connect.bind(this),
-            this.#options.reconnectInterval // TODO backoff factor
-          );
+          this.#reconnectionTimer = setTimeout(this.connect.bind(this), this.#options.reconnectInterval);
         }
       });
     } else {
-      this.#socket.connect({ host: this.#options.host, port: this.#options.port });
-      this.#socket.setKeepAlive(true, 30000);
+      // TODO further tests with keep-alive, might not work with GC-100
+      this.#socket.connect({
+        host: this.#options.host,
+        port: this.#options.port,
+        keepAlive: this.#options.tcpKeepAlive,
+        keepAliveInitialDelay: this.#options.tcpKeepAliveInitialDelay
+      });
     }
 
     return true;
@@ -193,6 +197,16 @@ class UnifiedClient extends EventEmitter {
       .map((x) => (x.startsWith("device,") ? x.substring(7) : x));
 
     return devices;
+  }
+
+  _recalculateReconnectInterval() {
+    const interval = Math.round(this.#currentReconnectInterval * this.#options.reconnectBackoffFactor);
+    this.#currentReconnectInterval =
+      interval > this.#options.reconnectIntervalMax ? this.#options.reconnectIntervalMax : interval;
+  }
+
+  get reconnectInterval() {
+    return this.#currentReconnectInterval;
   }
 }
 
