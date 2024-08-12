@@ -63,6 +63,7 @@ class UnifiedClient extends EventEmitter {
    */
   connect(opts) {
     this.setOptions(opts);
+    this.#reconnectSocket.stop();
     this.#reconnectSocket.start();
   }
 
@@ -136,10 +137,9 @@ class UnifiedClient extends EventEmitter {
         }
 
         if (response.startsWith("busyIR")) {
-          // TODO retest if still working! https://stackoverflow.com/questions/5911211/settimeout-inside-javascript-class-using-this
-          // TODO retest if request timeout is working
           const that = this;
           setTimeout(() => that.#socket.write(message), this.#options.retryInterval);
+          response = "";
         } else {
           resolve(response.substring(0, responseEndIndex).replaceAll("\r", "\n").trim());
         }
