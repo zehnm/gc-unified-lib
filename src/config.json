@@ -2,6 +2,7 @@
   "options": {
     "host": null,
     "port": 4998,
+    "queueTimeout": 200,
     "sendTimeout": 500,
     "retryInterval": 99,
     "connectionTimeout": 3000,

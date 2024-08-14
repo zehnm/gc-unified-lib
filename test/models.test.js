@@ -4,7 +4,9 @@ const {
   modelFromVersion,
   ProductFamily,
   parseDevices,
-  parseIrPort
+  parseIrPort,
+  checkErrorResponse,
+  expectedResponse
 } = require("../src/models");
 
 const getProductFamily = test.macro((t, input, expected) => {
@@ -162,3 +164,94 @@ test("parseIrPort with missing mode returns null", getIrPort, "IR,1:2", null);
 test("parseIrPort with invalid module returns null", getIrPort, "IR,a:2,SERIAL", null);
 test("parseIrPort with invalid port returns null", getIrPort, "IR,1:b,SERIAL", null);
 test("parseIrPort returns all fields", getIrPort, "IR,1:2,BL2_BLASTER", { module: 1, port: 2, mode: "BL2_BLASTER" });
+
+test("normal response is not an error", (t) => {
+  const response = "NET,0:1,UNLOCKED,DHCP,192.168.0.100,255.255.255.0,192.168.0.1\r";
+  const responseEndIndex = response.lastIndexOf("\r");
+
+  try {
+    checkErrorResponse(response, responseEndIndex);
+    t.pass();
+  } catch (e) {
+    t.fail(`No error expected, got: ${e}`);
+  }
+});
+
+const detectError = test.macro((t, input, expected) => {
+  const responseEndIndex = input.lastIndexOf("\r");
+
+  try {
+    checkErrorResponse(input, responseEndIndex);
+    t.fail("Error response not detected");
+  } catch (e) {
+    t.is(e.message, expected.msg);
+    t.is(e.code, expected.code);
+  }
+});
+
+test("detect GC-100 error", detectError, "unknowncommand 3\r", {
+  msg: "Invalid module address (module does not exist).",
+  code: "3"
+});
+test("detect iTach error", detectError, "ERR_1:1,014\r", {
+  msg: "Blaster command sent to non-blaster connector.",
+  code: "014"
+});
+test("detect Flex error", detectError, "ERR SL001\r", { msg: "Invalid baud rate.", code: "SL001" });
+test("detect Global Connect error", detectError, "ERR RO002\r", { msg: "Invalid logical relay state.", code: "RO002" });
+
+test("detect undefined GC-100 error", detectError, "unknowncommand 99\r", {
+  msg: "unknowncommand 99",
+  code: "99"
+});
+test("detect undefined iTach error", detectError, "ERR_1:1,042\r", { msg: "ERR_1:1,042", code: "042" });
+test("detect undefined Flex error", detectError, "ERR SL009\r", { msg: "ERR SL009", code: "SL009" });
+test("detect undefined Global Connect error", detectError, "ERR foobar\r", { msg: "ERR foobar", code: "foobar" });
+
+const getExpectedResponse = test.macro((t, input, expected) => {
+  const result = expectedResponse(input);
+  t.is(result, expected);
+});
+
+test("expectedResponse returns undefined for unknown request", getExpectedResponse, "foobar", undefined);
+test(
+  "expectedResponse doesn't return module:port for non-connector requests",
+  getExpectedResponse,
+  "getdevices",
+  "device"
+);
+test(
+  "expectedResponse returns module:port,ID for sendir",
+  getExpectedResponse,
+  "sendir,1:1,123,40000,1,1,96,24,48,24,24,24,48,24,24,24,48,24,24,24,24,24,48,24,24,24,24,24,24,24,24,1035",
+  "completeir,1:1,123"
+);
+test("expectedResponse returns module:port for stopir", getExpectedResponse, "stopir,1:1", "stopir,1:1");
+test("expectedResponse returns module:port for get_NET", getExpectedResponse, "get_NET,0:1", "NET,0:1");
+test(
+  "expectedResponse returns module:port for set_NET",
+  getExpectedResponse,
+  "set_NET,0:1,UNLOCKED,STATIC,192.168.0.50,255.255.255.0,192.168.0.1",
+  "NET,0:1"
+);
+test("expectedResponse returns module:port for get_IR", getExpectedResponse, "get_IR,1:2", "IR,1:2");
+test("expectedResponse returns module:port for set_IR", getExpectedResponse, "set_IR,1:2,RECEIVER", "IR,1:2");
+test("expectedResponse returns module:port for get_SERIAL", getExpectedResponse, "get_SERIAL,1:1", "SERIAL,1:1");
+test(
+  "expectedResponse returns module:port for set_SERIAL",
+  getExpectedResponse,
+  "set_SERIAL,1:1,38400,FLOW_HARDWARE,PARITY_EVEN",
+  "SERIAL,1:1"
+);
+test("expectedResponse returns module:port for get_RELAY", getExpectedResponse, "get_RELAY,1:1", "RELAY,1:1");
+test("expectedResponse returns module:port for set_RELAY", getExpectedResponse, "set_RELAY,1:1,Disabled", "RELAY,1:1");
+test("expectedResponse returns module:port for getstate", getExpectedResponse, "getstate,1:1", "state,1:1");
+test("expectedResponse returns module:port for setstate", getExpectedResponse, "setstate,3:2,0", "state,3:2");
+test(
+  "expectedResponse returns module:port for getstate with carriage return",
+  getExpectedResponse,
+  "getstate,1:1\r",
+  "state,1:1"
+);
+
+test("expectedResponse returns version for getversion", getExpectedResponse, "getversion\r", "version");

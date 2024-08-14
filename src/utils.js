@@ -1,5 +1,3 @@
-const { ERRORCODES } = require("./config");
-
 /**
  * Rejects a passed promise if it hasn't completed in time
  *
@@ -32,11 +30,16 @@ const createQueue = (taskFunc, concurrency = 1) => {
     active += 1;
     const queueItem = queue.shift();
     try {
-      if (queueItem.timeout) {
+      if (queueItem.timer) {
+        clearTimeout(queueItem.timer);
+      }
+      if (queueItem.expired) {
+        // skip expired item, process next one
+      } else if (queueItem.timeout) {
         queueItem.resolve(
           timeoutPromise({
             promise: taskFunc(queueItem.task),
-            timeout: queueItem.timeout,
+            timeout: queueItem.timeout, // TODO adjust remaining timeout (i.e. deduct waiting time in queue) or add a separate queue waiting timeout?
             error: new Error("QueueTaskTimeout: Task failed to complete before timeout was reached.")
           })
         );
@@ -51,10 +54,29 @@ const createQueue = (taskFunc, concurrency = 1) => {
     }
   };
 
+  const createQueueItem = function (task, sendTimeout, queueTimeout, resolve, reject) {
+    const timestamp = Date.now();
+    const expired = false;
+    const queueItem = { timestamp, expired, task, resolve, reject, timeout: sendTimeout, timer: null };
+    if (queueTimeout) {
+      queueItem.timer = setTimeout(() => {
+        queueItem.expired = true;
+        queueItem.reject(`Request is expired (${queueTimeout}ms)`);
+      }, queueTimeout);
+    }
+
+    return queueItem;
+  };
+
   return {
-    push: (task, timeout) =>
+    push: (task, sendTimeout, queueTimeout) =>
       new Promise((resolve, reject) => {
-        queue.push({ task, resolve, reject, timeout });
+        queue.push(createQueueItem(task, sendTimeout, queueTimeout, resolve, reject));
+        run();
+      }),
+    priority: (task, sendTimeout, queueTimeout) =>
+      new Promise((resolve, reject) => {
+        queue.unshift(createQueueItem(task, sendTimeout, queueTimeout, resolve, reject));
         run();
       }),
     pause: () => {
@@ -75,42 +97,4 @@ const createQueue = (taskFunc, concurrency = 1) => {
   };
 };
 
-/**
- * Check if a Global Caché response message is an error response.
- *
- * @param response the response message.
- * @param responseEndIndex end index of the response message.
- * @throws Error is thrown in case of an error response.
- */
-function checkErrorResponse(response, responseEndIndex) {
-  if (response.startsWith("ERR_")) {
-    // handle iTach errors
-    const errorCode = response.substring(responseEndIndex - 3, responseEndIndex);
-    const msg = ERRORCODES[errorCode];
-    if (msg === undefined) {
-      throw new Error(response.trim());
-    } else {
-      throw new Error(`${msg} (${response.trim()})`);
-    }
-  } else if (response.startsWith("ERR ")) {
-    // handle Flex & Global Connect errors
-    const errorCode = response.trim();
-    const msg = ERRORCODES[errorCode];
-    if (msg === undefined) {
-      throw new Error(errorCode);
-    } else {
-      throw new Error(`${msg} (${response.trim()})`);
-    }
-  } else if (response.startsWith("unknowncommand")) {
-    // handle GC-100 errors
-    const errorCode = response.trim();
-    const msg = ERRORCODES[errorCode];
-    if (msg === undefined) {
-      throw new Error(errorCode);
-    } else {
-      throw new Error(`${msg} (${response.substring(14).trim()})`);
-    }
-  }
-}
-
-module.exports = { createQueue, checkErrorResponse };
+module.exports = { createQueue };

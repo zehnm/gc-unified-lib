@@ -1,5 +1,5 @@
 const net = require("net");
-const { checkErrorResponse } = require("./utils");
+const { ERRORCODES } = require("./config");
 
 const ProductFamily = {
   UNKNOWN: "Unknown",
@@ -391,6 +391,112 @@ function parseIrPort(response) {
   return new IrPort(module, port, mode);
 }
 
+/**
+ * Check if a Global Caché response message is an error response.
+ *
+ * @param {string} response the response message.
+ * @param {number} [responseEndIndex] end index of the response message.
+ * @param {Object<string, *>} [options] optional options to fill {@link ResponseError} details like host and port.
+ * @throws ResponseError is thrown in case of an error response.
+ */
+function checkErrorResponse(response, responseEndIndex = response.length, options) {
+  if (response.startsWith("ERR_")) {
+    // handle iTach errors
+    const errorCode = response.substring(responseEndIndex - 3, responseEndIndex);
+    const msg = ERRORCODES[errorCode];
+    throw new ResponseError(msg || response.trim(), errorCode, options);
+  } else if (response.startsWith("ERR ")) {
+    // handle Flex & Global Connect errors
+    const errorCode = response.trim();
+    const msg = ERRORCODES[errorCode];
+    throw new ResponseError(msg || errorCode, response.substring(4).trim(), options);
+  } else if (response.startsWith("unknowncommand")) {
+    // handle GC-100 errors
+    const errorCode = response.trim();
+    const msg = ERRORCODES[errorCode];
+    throw new ResponseError(msg || errorCode, response.substring(14).trim(), options);
+  }
+}
+
+const Requests = {
+  getversion: "version", // special case, only works for GC-100, other models directly return the version string!
+  getdevices: "device",
+  get_NET: "NET",
+  set_NET: "NET",
+  get_IR: "IR",
+  set_IR: "IR",
+  sendir: "completeir", // busyir is handled in receive handler
+  stopir: "stopir",
+  get_IRL: "IR Learner Enabled", // TODO handle sendir as out-of-bound event
+  stop_IRL: "IR Learner Disabled",
+  receiveIR: "receiveIR", // TODO handle sendir as out-of-bound event
+  get_SERIAL: "SERIAL",
+  set_SERIAL: "SERIAL",
+  get_RELAY: "RELAY",
+  set_RELAY: "RELAY",
+  getstate: "state",
+  setstate: "state"
+};
+
+/**
+ * Return the expected response message prefix for a given request message.
+ * @param {string} message the request message
+ * @return {string|undefined}
+ */
+function expectedResponse(message) {
+  const parts = message.trim().split(",", 3);
+
+  const msg = Requests[parts[0]];
+  const connector = parts[1];
+
+  if (parts[0] === "sendir" && parts[2]) {
+    return msg + "," + connector + "," + parts[2];
+  }
+  if (connector) {
+    return msg + "," + connector;
+  }
+
+  return msg;
+}
+
+/**
+ * Generic Global Caché device exception.
+ */
+class GcError extends Error {
+  constructor(message, code, address, port) {
+    super(message);
+    this.code = code;
+    this.address = address;
+    this.port = port;
+    Error.captureStackTrace(this, GcError);
+  }
+}
+
+/**
+ * Global Caché device connection exception.
+ *
+ * Most of the time, this error simply wraps a TCP Socket Error. The following custom error codes are used:
+ * - `ETIMEDOUT`: connection timeout if connection could not be established.
+ * - `ECONNLOST`: connection lost after connection has been established.
+ */
+class ConnectionError extends GcError {
+  constructor(message, code, address, port, cause = undefined) {
+    super(message, code, address, port);
+    this.cause = cause;
+    Error.captureStackTrace(this, ConnectionError);
+  }
+}
+
+/**
+ * Global Caché response error exception.
+ */
+class ResponseError extends GcError {
+  constructor(message, code, options = undefined) {
+    super(message, code, options?.host, options?.port);
+    Error.captureStackTrace(this, ConnectionError);
+  }
+}
+
 module.exports = {
   ProductFamily,
   PortType,
@@ -401,5 +507,10 @@ module.exports = {
   productFamilyFromVersion,
   modelFromVersion,
   parseDevices,
-  parseIrPort
+  parseIrPort,
+  checkErrorResponse,
+  expectedResponse,
+  GcError,
+  ConnectionError,
+  ResponseError
 };
