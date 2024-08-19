@@ -7,9 +7,22 @@ Note: Only tested with GC-100-12 and IP2IR devices, but it should work with any 
 
 ## Installation
 
+This module is not yet available in the npmjs registry and must be installed from GitHub:
+
 ```shell
 npm install https://github.com/zehnm/gc-unified-lib.git
 ```
+
+⚠️ This installs the latest, bleeding edge development version from the GitHub repository. This can either be desired
+for development, or have undesired side effects when doing `npm update` (which pulls the latest version from the default
+branch).
+
+A specific Git hash can be added to pin the version:
+
+```shell
+npm install https://github.com/zehnm/gc-unified-lib.git#$HASH
+```
+See npm documentation for all options.
 
 ## Example
 
@@ -166,6 +179,32 @@ client.on("error", function (error) {
     // Error occurred
 });
 ```
+
+### Logging
+
+Logging any kind of output is directed to the [debug](https://www.npmjs.com/package/debug) module.
+To let the gc-unified-lib output anything, run your app with the `DEBUG` environment variable set like:
+
+```shell
+DEBUG=gclib:* node app.js
+```
+
+gc-unified-lib exposes the following log-levels:
+
+- `gclib:msg`: TCP socket message trace
+- `gclib:debug`: debugging messages
+- `gclib:debug:socket`: socket related debugging messages 
+- `gclib:info`: informational messages
+- `gclib:warn`: warnings
+- `gclib:error`: errors
+
+If you only want to get errors and warnings reported:
+
+```shell
+DEBUG=gclib:warn,gclib:error node app.js
+```
+
+Combine those settings with your existing application if any of your other modules or libs also uses __debug__
 
 ## TODO
 

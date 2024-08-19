@@ -1,5 +1,6 @@
 const net = require("net");
 const { ERRORCODES } = require("./config");
+const { debug, warn } = require("./loggers");
 
 const ProductFamily = {
   UNKNOWN: "Unknown",
@@ -215,7 +216,7 @@ async function retrieveDeviceInfo(host, port = 4998, connectionTimeout = 6000, r
     socket.on("connect", () => {
       clearTimeout(timeoutId);
       socket.setTimeout(readTimeout);
-      console.debug("Sending getversion");
+      debug("Sending getversion");
       socket.write("getversion\r");
     });
 
@@ -254,7 +255,7 @@ async function retrieveDeviceInfo(host, port = 4998, connectionTimeout = 6000, r
         version = response.trim();
         response = "";
         state = DeviceInfoState.DEVICES;
-        console.debug("Sending getdevices");
+        debug("Sending getdevices");
         socket.write("getdevices\r");
         return;
       } else if (state === DeviceInfoState.DEVICES) {
@@ -267,7 +268,7 @@ async function retrieveDeviceInfo(host, port = 4998, connectionTimeout = 6000, r
         const device = devices.shift();
         if (device !== undefined) {
           const request = `get_IR,${device.module}:${device.port}\r`;
-          console.debug("Sending", request);
+          debug("Sending", request);
 
           socket.write(request);
           return;
@@ -282,7 +283,7 @@ async function retrieveDeviceInfo(host, port = 4998, connectionTimeout = 6000, r
         if (device !== undefined) {
           response = "";
           const request = `get_IR,${device.module}:${device.port}\r`;
-          console.debug("Sending", request);
+          debug("Sending", request);
 
           socket.write(request);
           return;
@@ -316,7 +317,7 @@ function parseDevices(response) {
   deviceLines.forEach((device) => {
     const match = DEVICE_REGEX.exec(device);
     if (match === null || match.length !== 4) {
-      console.debug("Invalid device format:", device);
+      warn("Invalid device format:", device);
       return;
     }
 
@@ -325,7 +326,7 @@ function parseDevices(response) {
     const portType = match[3];
 
     if (isNaN(module) || isNaN(portCount)) {
-      console.debug("Invalid module (%s) or port count (%s)", match[1], match[2]);
+      warn("Invalid module (%s) or port count (%s)", match[1], match[2]);
       return;
     }
 
@@ -375,7 +376,7 @@ function parseIrPort(response) {
 
   const match = IR_REGEX.exec(response.trim());
   if (match === null || match.length !== 4) {
-    console.debug("Invalid IR PORT format:", response);
+    warn("Invalid IR PORT format:", response);
     return null;
   }
 
@@ -384,7 +385,7 @@ function parseIrPort(response) {
   const mode = match[3];
 
   if (isNaN(module) || isNaN(port)) {
-    console.debug("Invalid module (%s) or port (%s)", match[1], match[2]);
+    warn("Invalid module (%s) or port (%s)", match[1], match[2]);
     return null;
   }
 

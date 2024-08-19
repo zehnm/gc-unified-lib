@@ -1,4 +1,5 @@
 const dgram = require("dgram");
+const { msgTrace, info, warn } = require("./loggers");
 
 /**
  * Split a received discovery beacon from a Global Caché device and return all key / value pairs as a Map.
@@ -12,7 +13,7 @@ function splitBeacon(beacon) {
   const BEACON_REGEX = /<-?([\w-]+)=([\w-.:/]+)>/g;
 
   if (!beacon.startsWith("AMXB")) {
-    console.debug("Invalid discovery beacon");
+    warn("Invalid discovery beacon");
     return null;
   }
 
@@ -20,8 +21,8 @@ function splitBeacon(beacon) {
   let match;
 
   while ((match = BEACON_REGEX.exec(beacon)) !== null) {
-    if (match === null || match.length !== 3) {
-      console.debug("Invalid beacon format");
+    if (match.length !== 3) {
+      warn("Invalid beacon format");
       continue;
     }
     result.set(match[1], match[2]);
@@ -30,6 +31,7 @@ function splitBeacon(beacon) {
   return result;
 }
 
+// TODO add abort signal to stop discovery
 /**
  * Discover Global Caché devices for the specified duration, then return all found devices.
  *
@@ -54,7 +56,7 @@ async function discover(duration = 60000) {
     socket.on("message", (msg, remoteInfo) => {
       const beacon = msg.toString();
       if (beacon) {
-        console.debug(`Message from ${remoteInfo.address}:${remoteInfo.port}: ${beacon}`);
+        msgTrace(`[${remoteInfo.address}:${remoteInfo.port}] ${beacon}`);
         const parsedBeacon = splitBeacon(beacon);
         parsedBeacon.set("address", remoteInfo.address);
         const id = parsedBeacon.get("UUID");
@@ -67,8 +69,8 @@ async function discover(duration = 60000) {
     socket.on("listening", () => {
       const serverAddress = socket.address();
 
-      console.debug(
-        `Starting discovery of GlobalCache devices on ${serverAddress.address}:${serverAddress.port} for ${
+      info(
+        `Starting discovery of Global Caché devices on ${serverAddress.address}:${serverAddress.port} for ${
           duration / 1000
         }s`
       );
