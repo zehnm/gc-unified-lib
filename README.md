@@ -1,7 +1,10 @@
 # gc-unified-lib
 
-Simple Node.js module to send commands to Global Caché devices supporting the Unified TCP API. Should handle
-reconnection (if connection lost), resending (on busyIR), etc., but not abstract away the Unified TCP API.
+Global Caché communication library for devices supporting the Unified TCP API. Handles device discovery, reconnection
+(if connection lost), resending (on busyIR), smooth continuous IR repeat mode, and error response handling. 
+
+The library focuses on sending IR without abstracting away the Unified TCP API. Other functionality like relay control
+and module configuration is still possible.
 
 Note: Only tested with GC-100-12 and IP2IR devices, but it should work with any of the Global Caché product family devices.
 
@@ -10,6 +13,11 @@ Note: Only tested with GC-100-12 and IP2IR devices, but it should work with any 
 Requirements:
 - Install [nvm](https://github.com/nvm-sh/nvm) (Node.js version manager) for local development
 - Node.js v20.16 or newer (older versions are not tested)
+
+Node module dependencies:
+- [debug](https://www.npmjs.com/package/debug) for log output handling.
+- [reconnecting-socket](https://www.npmjs.com/package/reconnecting-socket), [node-backoff](https://www.npmjs.com/package/node-backoff)
+  for sockets reconnection.
 
 This module is not yet available in the npmjs registry and must be installed from GitHub:
 
@@ -64,7 +72,9 @@ _Arguments_
     - `options.host` - (Default: null) Hostname/IP to connect to
     - `options.port` - (Default: 4998) Port to connect to
     - `options.reconnect` - (Default: false) Try to reconnect if connection is lost
-    - `options.backoff` - backoff options from [MathieuTurcotte/node-backoff](https://github.com/MathieuTurcotte/node-backoff#readme).  
+    - `options.reconnectDelay` - (Default: 200) Delay (in milliseconds) for initial reconnection attempt if a connection
+      has been dropped after connection has been established.
+    - `options.backoff` - reconnection backoff options from [MathieuTurcotte/node-backoff](https://github.com/MathieuTurcotte/node-backoff#readme).  
        Default:
       ```js
       {
@@ -76,12 +86,14 @@ _Arguments_
       }
       ```
     - `options.connectionTimeout` - (Default: 3000) Timeout (in milliseconds) when connection attempt is assumed to be
-      failed. error event will be emitted.
-    - `options.reconnectDelay` - (Default: 200) Delay (in milliseconds) for initial reconnection attempt if a connection has been dropped after connection has been established. 
+      failed. Error event will be emitted.
     - `options.retryInterval`- (Default: 99) Time (in milliseconds) between resending attempts (when busyIR is received)
+    - `options.queueTimeout` - (Default: 200) Maximum time (in milliseconds) a new request may remain in the queue
+      before it has to be sent to the device.
     - `options.sendTimeout` - (Default: 500) Time (in milliseconds) after which a sent command will be assumed lost
     - `options.tcpKeepAlive` - (Default: false) Enable/ disable the native TCP keep-alive functionality
-    - `options.tcpKeepAliveInitialDelay` - (Default: 30000) Set the delay in milliseconds between the last data packet received and the first keepalive probe. Setting 0 will leave the value unchanged from the default (or previous) setting.
+    - `options.tcpKeepAliveInitialDelay` - (Default: 30000) Set the delay in milliseconds between the last data packet
+      received and the first keepalive probe. Setting 0 will leave the value unchanged from the default (or previous) setting.
 
 ⚠️ `options.backoff` can only be set in the `UnifiedClient()` constructor and has no effect in the `setOptions`,
    `connect()` and `close()` calls! 
@@ -213,6 +225,7 @@ Combine those settings with your existing application if any of your other modul
 ## TODO
 
 - Rename itach module, goal is to support the complete product family.
+- IR learning support, emit events for every received sendir message.
 
 ## Links
 

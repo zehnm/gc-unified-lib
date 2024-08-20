@@ -1,6 +1,7 @@
 const { debug, info, warn } = require("./loggers");
-const { expectedResponse, modelFromVersion, ResponseError } = require("./models");
+const { expectedResponse, modelFromVersion, ResponseError, checkErrorResponse } = require("./models");
 const { timeoutPromise } = require("./utils");
+const { options: defaultOptions } = require("./config");
 
 /**
  * Public {@link MessageQueue} item.
@@ -31,6 +32,7 @@ class MsgItem {
 
   /**
    * Construct a new internal MsgItem.
+   *
    * @param {number} id unique message identifier.
    * @param {string} message request message.
    * @param resolve
@@ -84,9 +86,11 @@ class MessageQueue {
   #list = [];
   #active = 0;
   #paused = false;
+  #options = { ...defaultOptions };
 
   /**
    * Construct a new message queue.
+   *
    * @param taskFunc callback function to call when a message item is processed. This is usually the "message send"
    *                 function, like writing the request message to a socket.
    */
@@ -134,7 +138,12 @@ class MessageQueue {
     this.#list.length = 0;
   }
 
-  drop() {
+  /**
+   * Clear queue, drop all queued messages immediately **without** rejecting any messages.
+   *
+   * ⚠️ Use with caution: may leave item Promises in limbo! Intended for unit tests only.
+   */
+  _drop() {
     for (const item of this.#list) {
       clearTimeout(item.queueTimerId);
     }
@@ -142,12 +151,18 @@ class MessageQueue {
   }
 
   /**
-   * Add a new request to the end of the queue.
+   * Add a new request to the queue. By default, the message is put at the end of the queue.
+   *
    * @param {string} request request message to send.
    * @param {Object} [params] optional named parameters.
    * @param {number} [params.sendTimeout] request message timeout in milliseconds.
    * @param {number} [params.queueTimeout] queue timeout in milliseconds before the request needs to be sent.
    * @param {boolean} [params.priority=false] handle message as a priority message and put it at the start of the queue.
+   * @throws {ResponseError} if the message could not be sent, or an error response was received. For queue processing
+   *   errors, the following `code` values are defined:
+   *   - `QUEUE_TIMEOUT`: queue timeout expired, message could not be sent within the queue timeout.
+   *   - `SEND_TIMEOUT`: message request timeout, no response received within the timeout.
+   *   - `QUEUE_CLEARED`: the queue was cleared and all pending messages were removed, e.g. if the client disconnects.
    */
   async push(request, { sendTimeout = 1000, queueTimeout = 500, priority = false } = {}) {
     this.#msgId += 1;
@@ -186,14 +201,6 @@ class MessageQueue {
       }
       this.#run();
     });
-  }
-
-  /**
-   * Add a new priority request. The message will be sent as soon as possible.
-   * @param {string} request
-   */
-  async priority(request) {
-    return this.push(request, { priority: true });
   }
 
   async #run() {
@@ -255,18 +262,77 @@ class MessageQueue {
     }
   }
 
+  /**
+   * A Promise wrapper to remove the message item from the queue after it has been resolved or rejected.
+   *
+   * @param {number} id message identifier
+   * @param {Promise} promise Argument to be resolved by this Promise. Can also be a Promise or a thenable to resolve.
+   * @return {Promise} A Promise  that is resolved with the given value, or the promise passed as value, if the value was a promise object.
+   */
   async #removeQueueItemWrapper(id, promise) {
     try {
       return await Promise.resolve(promise);
     } finally {
       const request = this.#removeItemByMsgId(id);
       if (request) {
-        debug("removed request %d (%s)", request.id, request.msgPrefix);
+        debug("Removed request %d (%s)", request.id, request.msgPrefix);
       }
     }
   }
 
-  handleResponse(response) {
+  /**
+   * Process a received message, which is either a response message to a previous request, or an error response.
+   *
+   * @param {string} response original response message from device
+   * @param {Object<string, *>} [options] optional options to fill {@link ResponseError} details like host and port.
+   * @return {boolean} true if the response message could be handled, false if no corresponding request is available.
+   */
+  handleResponse(response, options) {
+    // handle error response
+    try {
+      checkErrorResponse(response, response.length, options || this.#options);
+    } catch (e) {
+      return this.handleErrorResponse(response, e);
+    }
+
+    // handle normal response
+    // TODO does busyir exist? iTach responds with busyIR, but Unified TCP API specifies busyir!
+    if (response.startsWith("busyIR") || response.startsWith("busyir")) {
+      // resend "sendir" command if port is busy
+      const request = this.getBusyIrRequest(response);
+      if (request) {
+        // only resend if at least 100ms are remaining before the send timeout expires. Otherwise, we'll always run into a timeout!
+        const totalTime = Date.now() - request.timestamp + this.#options.retryInterval;
+        if (totalTime + 100 > this.#options.sendTimeout) {
+          const err = new ResponseError(
+            `${response} - aborting sendir retry, send timeout reached (interval: ${this.#options.retryInterval}ms, remaining: ${this.#options.sendTimeout - totalTime}ms)`,
+            "BUSY_IR",
+            this.#options
+          );
+          // debug("[socket] %s: aborting sendir retry, send timeout reached (interval: %dms, remaining: %dms)", response, this.#options.retryInterval, this.#options.sendTimeout - totalTime);
+          request.reject(err);
+        } else {
+          info("%s: retrying %s in %dms", response, request.msgPrefix, this.#options.retryInterval);
+          const that = this;
+          setTimeout(() => that.#taskFunc(request.message), this.#options.retryInterval);
+        }
+        return true;
+      }
+    } else {
+      return this.handleNormalResponse(response);
+    }
+
+    info("Ignoring %s: no pending request found", response);
+    return false;
+  }
+
+  /**
+   * Process a response message.
+   *
+   * @param {string} response original response message from device
+   * @return {boolean} true if the response message could be handled, false if no corresponding request is available.
+   */
+  handleNormalResponse(response) {
     if (response.startsWith("stopir")) {
       const original = "sendir" + response.substring(6);
       const pendingRequest = this.#filterRequests(original);
@@ -298,6 +364,13 @@ class MessageQueue {
     return true;
   }
 
+  /**
+   * Process an error response.
+   *
+   * @param {string} response original response message from device
+   * @param {ResponseError} err resolved ResponseError from the message
+   * @return {boolean} true if the error response could be handled, false if no corresponding request is available.
+   */
   handleErrorResponse(response, err) {
     const request = this.#resolveError(response, err);
     if (!request) {
@@ -315,6 +388,7 @@ class MessageQueue {
 
   /**
    * Resolve a corresponding request of a given response message. The resolved request is removed from the queue.
+   *
    * @param {string} response the response message, may not be an error response!
    * @return {MsgItem, undefined}
    */
@@ -366,7 +440,8 @@ class MessageQueue {
 
   /**
    * Queue cleanup after a successful response. Clean up all older requests of the same request type.
-   * @param request
+   *
+   * @param {string} request
    */
   #removeOlderRequests(request) {
     if (!request || this.#list.length === 0) {
@@ -416,7 +491,7 @@ class MessageQueue {
   getBusyIrRequest(response) {
     // TODO does sendir always return connector address? Different information in iTach (yes) vs Unified TCP API (no) docs!
     const parts = response.split(",");
-    // TODO is it busyIR or busyir? Different information in iTach (busyIR) vs Unified TCP API (busyir) docs!
+    // TODO does busyir exist? iTach responds with busyIR, but Unified TCP API specifies busyir!
     if (parts[0] !== "busyIR" && parts[0] !== "busyir") {
       return undefined;
     }
@@ -445,6 +520,7 @@ class MessageQueue {
 
   /**
    * Remove and return a message item by message identifier.
+   *
    * @param {number} id message identifier
    * @return {MsgItem|undefined}
    */
@@ -458,6 +534,7 @@ class MessageQueue {
 
   /**
    * Remove and return a request item at a given index.
+   *
    * @param  {number} index position of the item to remove.
    * @return {MsgItem|undefined}
    */

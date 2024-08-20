@@ -14,7 +14,7 @@ test("nothing run when paused", (t) => {
   q.push(someItem);
   q.push(someItem);
   q.push(someItem);
-  q.drop();
+  q._drop();
   t.true(taskFunc.notCalled);
 });
 

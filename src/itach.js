@@ -7,13 +7,12 @@ const {
   productFamilyFromVersion,
   modelFromVersion,
   retrieveDeviceInfo,
-  checkErrorResponse,
   ConnectionError,
   GcError,
   ResponseError
 } = require("./models");
 const ReconnectingSocket = require("reconnecting-socket");
-const { msgTrace, debug, debugSocket, warn } = require("./loggers");
+const { msgTrace, debugSocket } = require("./loggers");
 const { MessageQueue } = require("./msg_queue");
 
 class UnifiedClient extends EventEmitter {
@@ -82,13 +81,14 @@ class UnifiedClient extends EventEmitter {
 
   send(data) {
     const msg = data.endsWith("\r") ? data : data + "\r";
-    if (msg.startsWith("stopir")) {
-      return this.#queue.priority(msg, this.#options.sendTimeout, this.#options.queueTimeout);
-    } else {
-      // TODO dynamic sendTimeout calculation for sendir requests? The IR transmission duration could be calculated...
-      //      Or just a different timeout for irsend might be enough to start with!
-      return this.#queue.push(msg, this.#options.sendTimeout, this.#options.queueTimeout);
-    }
+    const priority = msg.startsWith("stopir");
+    // TODO dynamic sendTimeout calculation for sendir requests? The IR transmission duration could be calculated...
+    //      Or just a different timeout for irsend might be enough to start with!
+    return this.#queue.push(msg, {
+      sendTimeout: this.#options.sendTimeout,
+      queueTimeout: this.#options.queueTimeout,
+      priority
+    });
   }
 
   /**
@@ -133,53 +133,8 @@ class UnifiedClient extends EventEmitter {
     // message complete: process it
     const response = this.#response.substring(0, responseEndIndex).replaceAll("\r", "\n").trim();
     this.#response = "";
-    this.#handleResponse(response);
-  }
-
-  /**
-   * Process a received message, which is either a response message to a previous request, or an error response.
-   * @param response
-   */
-  #handleResponse(response) {
-    // handle error response
-    try {
-      checkErrorResponse(response, response.length, this.#options);
-    } catch (e) {
-      this.#queue.handleErrorResponse(response, e);
-      return;
-    }
-
-    // handle normal response
-    // TODO is it busyIR or busyir? Different information in iTach (busyIR) vs Unified TCP API (busyir) docs!
-    if (response.startsWith("busyIR") || response.startsWith("busyir")) {
-      // resend "sendir" command if port is busy
-      const request = this.#queue.getBusyIrRequest(response);
-      if (request) {
-        // only resend if at least 100ms are remaining before the send timeout expires. Otherwise, we'll always run into a timeout!
-        const totalTime = Date.now() - request.timestamp + this.#options.retryInterval;
-        if (totalTime + 100 > this.#options.sendTimeout) {
-          const err = new ResponseError(
-            `${response} - aborting sendir retry, send timeout reached (interval: ${this.#options.retryInterval}ms, remaining: ${this.#options.sendTimeout - totalTime}ms)`,
-            "BUSY_IR",
-            this.#options
-          );
-          // debug("[socket] %s: aborting sendir retry, send timeout reached (interval: %dms, remaining: %dms)", response, this.#options.retryInterval, this.#options.sendTimeout - totalTime);
-          request.reject(err);
-        } else {
-          debug("%s: retrying %s in %dms", response, request.msgPrefix, this.#options.retryInterval);
-          const that = this;
-          setTimeout(() => that.#socket.write(request.message), this.#options.retryInterval);
-        }
-        return;
-      } else {
-        warn("Ignoring busyIR");
-      }
-    } else {
-      this.#queue.handleResponse(response);
-      return;
-    }
-
-    debug("%s: ignoring, no pending request found", response);
+    // this.#handleResponse(response);
+    this.#queue.handleResponse(response, this.#options);
   }
 
   #onSocketError(error) {
