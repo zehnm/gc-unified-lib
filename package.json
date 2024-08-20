@@ -37,7 +37,7 @@
     "sinon": "^18.0.0"
   },
   "engines": {
-    "node": ">=16.18.0"
+    "node": ">=20.16.0"
   },
   "dependencies": {
     "debug": "^4.3.6",

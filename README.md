@@ -7,6 +7,10 @@ Note: Only tested with GC-100-12 and IP2IR devices, but it should work with any 
 
 ## Installation
 
+Requirements:
+- Install [nvm](https://github.com/nvm-sh/nvm) (Node.js version manager) for local development
+- Node.js v20.16 or newer (older versions are not tested)
+
 This module is not yet available in the npmjs registry and must be installed from GitHub:
 
 ```shell
