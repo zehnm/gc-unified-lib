@@ -1,15 +1,12 @@
-const msgTrace = require("debug")("gclib:msg");
-const debug = require("debug")("gclib:debug");
-const debugSocket = require("debug")("gclib:debug:socket");
-const info = require("debug")("gclib:info");
-const warn = require("debug")("gclib:warn");
-const error = require("debug")("gclib:error");
+const debugModule = require("debug");
 
-module.exports = {
-  msgTrace,
-  debug,
-  debugSocket,
-  info,
-  warn,
-  error
+const log = {
+  msgTrace: debugModule("gclib:msg"),
+  debug: debugModule("gclib:debug"),
+  debugSocket: debugModule("gclib:debug:socket"),
+  info: debugModule("gclib:info"),
+  warn: debugModule("gclib:warn"),
+  error: debugModule("gclib:error")
 };
+
+module.exports = log;

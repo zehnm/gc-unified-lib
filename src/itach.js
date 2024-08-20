@@ -12,7 +12,7 @@ const {
   ResponseError
 } = require("./models");
 const ReconnectingSocket = require("reconnecting-socket");
-const { msgTrace, debugSocket } = require("./loggers");
+const log = require("./loggers");
 const { MessageQueue } = require("./msg_queue");
 
 class UnifiedClient extends EventEmitter {
@@ -36,7 +36,7 @@ class UnifiedClient extends EventEmitter {
     this.#socket.on("data", this.#onSocketData.bind(this));
     this.#reconnectSocket = this.#createReconnectingSocket(this.#socket, this.#options, this.#queue);
     this.#reconnectSocket.on("info", (msg) => {
-      debugSocket(msg);
+      log.debugSocket(msg);
     });
     this.#reconnectSocket.on("state", (state) => {
       this.emit("state", state);
@@ -118,7 +118,7 @@ class UnifiedClient extends EventEmitter {
    * @param data
    */
   #onSocketData(data) {
-    msgTrace("->", data.trim());
+    log.msgTrace("->", data.trim());
     this.#response += data;
     const responseEndIndex = this.#response.lastIndexOf("\r");
     if (responseEndIndex === -1) {
@@ -157,7 +157,7 @@ class UnifiedClient extends EventEmitter {
       }
     }
 
-    debugSocket(error);
+    log.debugSocket(error);
 
     this.emit("error", error);
   }
@@ -167,7 +167,7 @@ class UnifiedClient extends EventEmitter {
    * @param {string} message
    */
   #write(message) {
-    msgTrace("<-", message.trim());
+    log.msgTrace("<-", message.trim());
     this.#socket.write(message);
   }
 

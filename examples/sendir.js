@@ -5,7 +5,7 @@ const client = new UnifiedClient();
 
 const GC100 = false;
 
-const host = GC100 ? "192.168.1.184" : "192.168.1.129";
+const host = GC100 ? "172.16.16.184" : "172.16.16.129";
 const irModule = GC100 ? "4:1" : "1:1";
 const tcpKeepAlive = !GC100;
 

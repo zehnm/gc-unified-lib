@@ -1,4 +1,4 @@
-const { debug, info, warn } = require("./loggers");
+const log = require("./loggers");
 const { expectedResponse, modelFromVersion, ResponseError, checkErrorResponse } = require("./models");
 const { timeoutPromise } = require("./utils");
 const { options: defaultOptions } = require("./config");
@@ -102,7 +102,7 @@ class MessageQueue {
    * Pause message processing. Pending and new requests will no longer be sent.
    */
   pause() {
-    debug("Pausing queue");
+    log.debug("Pausing queue");
     this.#paused = true;
   }
 
@@ -113,7 +113,7 @@ class MessageQueue {
     if (!this.#paused) {
       return;
     }
-    debug("Resuming queue");
+    log.debug("Resuming queue");
     this.#paused = false;
     process.nextTick(() => {
       this.#run();
@@ -124,7 +124,7 @@ class MessageQueue {
    * Clear queue and reject all pending messages.
    */
   clear() {
-    debug("Clearing queue (%d items)", this.#list.length);
+    log.debug("Clearing queue (%d items)", this.#list.length);
     let queueItem;
     while (typeof (queueItem = this.#list.shift()) !== "undefined") {
       const err = new ResponseError("Message send queue cleared", "QUEUE_CLEARED");
@@ -182,12 +182,12 @@ class MessageQueue {
       const timerId = setTimeout(() => {
         that.#removeItemByMsgId(msgId);
         const msg = `Request ${msgId} is expired (${queueTimeout}ms)`;
-        debug(msg);
+        log.debug(msg);
         reject(new ResponseError(msg, "QUEUE_TIMEOUT"));
       }, queueTimeout);
 
       const item = new MsgItem(msgId, request, resolve, reject, timerId, sendTimeout);
-      debug(
+      log.debug(
         "Queueing new %srequest %d (pos: %d): %s",
         priority ? "priority " : "",
         item.id,
@@ -206,7 +206,7 @@ class MessageQueue {
   async #run() {
     const unprocessed = this.#unprocessedItemCount();
     if (this.#paused || this.#active >= 1 || unprocessed === 0) {
-      debug(
+      log.debug(
         "queue processing stopped (paused=%s, active=%d, unprocessed=%d, items=%d)",
         this.#paused,
         this.#active,
@@ -275,7 +275,7 @@ class MessageQueue {
     } finally {
       const request = this.#removeItemByMsgId(id);
       if (request) {
-        debug("Removed request %d (%s)", request.id, request.msgPrefix);
+        log.debug("Removed request %d (%s)", request.id, request.msgPrefix);
       }
     }
   }
@@ -309,10 +309,10 @@ class MessageQueue {
             "BUSY_IR",
             this.#options
           );
-          // debug("[socket] %s: aborting sendir retry, send timeout reached (interval: %dms, remaining: %dms)", response, this.#options.retryInterval, this.#options.sendTimeout - totalTime);
+          // log.debug("[socket] %s: aborting sendir retry, send timeout reached (interval: %dms, remaining: %dms)", response, this.#options.retryInterval, this.#options.sendTimeout - totalTime);
           request.reject(err);
         } else {
-          info("%s: retrying %s in %dms", response, request.msgPrefix, this.#options.retryInterval);
+          log.info("%s: retrying %s in %dms", response, request.msgPrefix, this.#options.retryInterval);
           const that = this;
           setTimeout(() => that.#taskFunc(request.message), this.#options.retryInterval);
         }
@@ -322,7 +322,7 @@ class MessageQueue {
       return this.handleNormalResponse(response);
     }
 
-    info("Ignoring %s: no pending request found", response);
+    log.info("Ignoring %s: no pending request found", response);
     return false;
   }
 
@@ -337,7 +337,7 @@ class MessageQueue {
       const original = "sendir" + response.substring(6);
       const pendingRequest = this.#filterRequests(original);
       for (const msgItem of pendingRequest) {
-        debug("Resolved request of %s (%s): %d", response, original, msgItem.id);
+        log.debug("Resolved request of %s (%s): %d", response, original, msgItem.id);
         if (msgItem.msgResolve) {
           msgItem.msgResolve(response);
         } else {
@@ -348,16 +348,16 @@ class MessageQueue {
 
     const request = this.#resolve(response);
     if (!request) {
-      info("Could not resolve request from:", response);
+      log.info("Could not resolve request from:", response);
       return false;
     }
 
-    debug("Resolved request %d from: %s", request?.id, response);
+    log.debug("Resolved request %d from: %s", request?.id, response);
 
     if (request.msgResolve) {
       request.msgResolve(response);
     } else {
-      warn("Resolved request %d doesn't have a message resolver. Message most likely didn't get sent!", request.id);
+      log.warn("Resolved request %d doesn't have a message resolver. Message most likely didn't get sent!", request.id);
       request.resolve(response);
     }
 
@@ -374,11 +374,11 @@ class MessageQueue {
   handleErrorResponse(response, err) {
     const request = this.#resolveError(response, err);
     if (!request) {
-      info("Could not resolve request from error response:", response);
+      log.info("Could not resolve request from error response:", response);
       return false;
     }
 
-    debug("resolved request %d from error response: %s", request?.id, response);
+    log.debug("resolved request %d from error response: %s", request?.id, response);
     if (request.msgReject) {
       request.msgReject(response);
     }
@@ -454,7 +454,7 @@ class MessageQueue {
     for (let i = this.#list.length - 1; i >= 0; i--) {
       if (this.#list[i].message.startsWith(prefix) && this.#list[i].timestamp < request.timestamp) {
         const removed = this.#remove(i);
-        debug("removed old request:", removed?.id);
+        log.debug("removed old request:", removed?.id);
       }
     }
   }
@@ -542,7 +542,7 @@ class MessageQueue {
     if (index >= this.#list.length) {
       return undefined;
     }
-    debug("Removing item index: %d (queue length: %d)", index, this.#list.length);
+    log.debug("Removing item index: %d (queue length: %d)", index, this.#list.length);
     if (index === 0) {
       return this.#list.shift();
     } else if (index === this.#list.length - 1) {
