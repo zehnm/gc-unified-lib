@@ -1,31 +1,57 @@
 # gc-unified-lib
 
-Simple Node.js module to send commands to Global Caché devices supporting the Unified TCP API. Should handle
-reconnection (if connection lost), resending (on busyIR), etc.. but not abstract away the Unified TCP API.
+Global Caché communication library for devices supporting the Unified TCP API. Handles device discovery, reconnection
+(if connection lost), resending (on busyIR), smooth continuous IR repeat mode, and error response handling. 
+
+The library focuses on sending IR without abstracting away the Unified TCP API. Other functionality like relay control
+and module configuration is still possible.
 
 Note: Only tested with GC-100-12 and IP2IR devices, but it should work with any of the Global Caché product family devices.
 
 ## Installation
 
+Requirements:
+- Install [nvm](https://github.com/nvm-sh/nvm) (Node.js version manager) for local development
+- Node.js v20.16 or newer (older versions are not tested)
+
+Node module dependencies:
+- [debug](https://www.npmjs.com/package/debug) for log output handling.
+- [reconnecting-socket](https://www.npmjs.com/package/reconnecting-socket), [node-backoff](https://www.npmjs.com/package/node-backoff)
+  for sockets reconnection.
+
+This module is not yet available in the npmjs registry and must be installed from GitHub:
+
 ```shell
 npm install https://github.com/zehnm/gc-unified-lib.git
 ```
 
+⚠️ This installs the latest, bleeding edge development version from the GitHub repository. This can either be desired
+for development, or have undesired side effects when doing `npm update` (which pulls the latest version from the default
+branch).
+
+A specific Git hash can be added to pin the version:
+
+```shell
+npm install https://github.com/zehnm/gc-unified-lib.git#$HASH
+```
+See npm documentation for all options.
+
 ## Example
 
 ```js
-var itach = require("itach");
+const { UnifiedClient } = require("gc-unified-lib");
+const client = new UnifiedClient();
 
-itach.on("connect", async () => {
+client.on("connect", async () => {
     console.log("Connected to itach");
     try {
-        const result = await itach.send("sendir:..")
+        const result = await client.send("sendir:..")
     } catch (error) {
         // Some error happened
     }
 });
 
-itach.connect({host: "itach", reconnect: true});
+client.connect({host: "192.168.1.234", reconnect: true});
 ```
 
 ## API
@@ -46,16 +72,36 @@ _Arguments_
     - `options.host` - (Default: null) Hostname/IP to connect to
     - `options.port` - (Default: 4998) Port to connect to
     - `options.reconnect` - (Default: false) Try to reconnect if connection is lost
-    - `options.reconnectInterval` - (Default: 3000) Time (in milliseconds) between reconnection attempts
+    - `options.reconnectDelay` - (Default: 200) Delay (in milliseconds) for initial reconnection attempt if a connection
+      has been dropped after connection has been established.
+    - `options.backoff` - reconnection backoff options from [MathieuTurcotte/node-backoff](https://github.com/MathieuTurcotte/node-backoff#readme).  
+       Default:
+      ```js
+      {
+        strategy: "fibonacci",
+        randomisationFactor: 0,
+        initialDelay: 500,
+        maxDelay: 10000,
+        failAfter: null
+      }
+      ```
     - `options.connectionTimeout` - (Default: 3000) Timeout (in milliseconds) when connection attempt is assumed to be
-      failed. error event will be emitted.
+      failed. Error event will be emitted.
     - `options.retryInterval`- (Default: 99) Time (in milliseconds) between resending attempts (when busyIR is received)
+    - `options.queueTimeout` - (Default: 200) Maximum time (in milliseconds) a new request may remain in the queue
+      before it has to be sent to the device.
     - `options.sendTimeout` - (Default: 500) Time (in milliseconds) after which a sent command will be assumed lost
+    - `options.tcpKeepAlive` - (Default: false) Enable/ disable the native TCP keep-alive functionality
+    - `options.tcpKeepAliveInitialDelay` - (Default: 30000) Set the delay in milliseconds between the last data packet
+      received and the first keepalive probe. Setting 0 will leave the value unchanged from the default (or previous) setting.
+
+⚠️ `options.backoff` can only be set in the `UnifiedClient()` constructor and has no effect in the `setOptions`,
+   `connect()` and `close()` calls! 
 
 _Examples_
 
 ```js
-itach.setOptions({host: "itachIP2IR", reconnect: true});
+client.setOptions({host: "itachIP2IR", reconnect: true});
 ```
 
 ---------------------------------------
@@ -71,11 +117,11 @@ _Arguments_
 _Examples_
 
 ```js
-itach.connect();
+client.connect();
 ```
 
 ```js
-itach.connect({host: "itachIP2IR", reconnect: true});
+client.connect({host: "itachIP2IR", reconnect: true});
 ```
 
 ---------------------------------------
@@ -89,11 +135,11 @@ Also note: You can change any options.
 _Example_
 
 ```js
-itach.close();
+client.close();
 ```
 
 ```js
-itach.close({reconnect: false});
+client.close({reconnect: false});
 ```
 
 ---------------------------------------
@@ -114,7 +160,7 @@ _Example_
 
 ```js
 try {
-    const result = await itach.send('sendir,1:1,1,38400,1,1,347,173,22,22,22,65,22,22,22,22,22,65,22,22,22,22,22,22,22,22,22,22,22,65,22,22,22,65,22,65,22,22,22,22,22,22,22,22,22,65,22,22,22,22,22,22,22,22,22,22,22,65,22,65,22,22,22,65,22,65,22,65,22,65,22,65,22,1657')
+    const result = await client.send('sendir,1:1,1,38400,1,1,347,173,22,22,22,65,22,22,22,22,22,65,22,22,22,22,22,22,22,22,22,22,22,65,22,22,22,65,22,65,22,22,22,22,22,22,22,22,22,65,22,22,22,22,22,22,22,22,22,22,22,65,22,65,22,22,22,65,22,65,22,65,22,65,22,65,22,1657')
     console.log(result) // completeir...
 } catch (error) {
     // handle error
@@ -125,6 +171,7 @@ try {
 
 __Events__
 
+- `state` - Connection state events: `stopped`, `opening`, `opened`, `closing`, `closed`, `reopening`, `failed`, `connectionTimeout`.
 - `connect` - Connection to device has been established and commands will now be sent
 - `close` - Connection to device has been closed
 - `error` - Some error with the socket connection
@@ -132,27 +179,53 @@ __Events__
 _Example_
 
 ```js
-itach.on("connect", function () {
+client.on("state", function (state) {
+  log.debug("Connection state change:", state);
+});
+
+client.on("connect", function () {
     // Connection established
 });
 
-itach.on("close", function () {
+client.on("close", function () {
     // Connection closed
 });
 
-itach.on("error", function (error) {
+client.on("error", function (error) {
     // Error occurred
 });
 ```
 
+### Logging
+
+Logging any kind of output is directed to the [debug](https://www.npmjs.com/package/debug) module.
+To let the gc-unified-lib output anything, run your app with the `DEBUG` environment variable set like:
+
+```shell
+DEBUG=gclib:* node app.js
+```
+
+gc-unified-lib exposes the following log-levels:
+
+- `gclib:msg`: TCP socket message trace
+- `gclib:debug`: debugging messages
+- `gclib:debug:socket`: socket related debugging messages 
+- `gclib:info`: informational messages
+- `gclib:warn`: warnings
+- `gclib:error`: errors
+
+If you only want to get errors and warnings reported:
+
+```shell
+DEBUG=gclib:warn,gclib:error node app.js
+```
+
+Combine those settings with your existing application if any of your other modules or libs also uses __debug__
+
 ## TODO
 
-- Enhance reconnection logic:
-    - Add backoff reconnection interval.
-    - Auto-reconnect if connection is dropped after connection has been established.
-- Keep-alive option.
 - Rename itach module, goal is to support the complete product family.
-- Multi-device connectivity: allow multiple instances to different devices.
+- IR learning support, emit events for every received sendir message.
 
 ## Links
 
