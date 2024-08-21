@@ -10,7 +10,7 @@ const log = require("./loggers");
 function splitBeacon(beacon) {
   // this regex might be a bit restrictive, but works with GC-100 & iTach devices.
   // Attention: GC-100 doesn't include a leading dash for all key names! (E.g. Config-Name, Config-URL).
-  const BEACON_REGEX = /<-?([\w-]+)=([\w-.:/]+)>/g;
+  const BEACON_REGEX = /<-?([\w-]+)=([\w-.:/ ]+)>/g;
 
   if (!beacon.startsWith("AMXB")) {
     log.warn("Invalid discovery beacon");

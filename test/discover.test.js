@@ -40,3 +40,19 @@ test(
     ["Status", "Ready"]
   ])
 );
+
+test(
+  "beacon parsing returns all elements from 3rd party devices containing spaces in values",
+  testSplitBeacon,
+  "AMXB<-UUID=SomeId42><-SDKClass=Utility><-Make=Foobar Inc><-Model=Foo 2000><-Revision=0-10-0><-Config-URL=http://192.168.1.101><-PCB_PN=123><-Status=Ready>",
+  new Map([
+    ["UUID", "SomeId42"],
+    ["SDKClass", "Utility"],
+    ["Make", "Foobar Inc"],
+    ["Model", "Foo 2000"],
+    ["Revision", "0-10-0"],
+    ["Config-URL", "http://192.168.1.101"],
+    ["PCB_PN", "123"],
+    ["Status", "Ready"]
+  ])
+);
