@@ -231,3 +231,23 @@ Combine those settings with your existing application if any of your other modul
 
 - Unified TCP API: <https://www.globalcache.com/files/docs/api-gc-unifiedtcp.pdf>
 - iTach API: <http://www.globalcache.com/files/docs/API-iTach.pdf>
+
+## Versioning
+
+We use [SemVer](http://semver.org/) for versioning. For the versions available, see the
+[tags and releases on this repository](https://github.com/zehnm/gc-unified-lib/releases).
+
+## Changelog
+
+The major changes found in each new release are listed in the [changelog](https://github.com/zehnm/gc-unified-lib/blob/main/CHANGELOG.md)
+and under the GitHub [releases](https://github.com/zehnm/gc-unified-lib/releases).
+
+## Contributions
+
+Please read our [contribution guidelines](https://github.com/zehnm/gc-unified-lib/blob/main/CONTRIBUTING.md)
+before opening a pull request.
+
+## License
+
+This project is licensed under the [**MIT**](https://choosealicense.com/licenses/mit/).
+See the [LICENSE](https://github.com/zehnm/gc-unified-lib/blob/main/LICENSE) file for details.

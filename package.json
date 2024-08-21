@@ -1,7 +1,7 @@
 {
   "name": "gc-unified-lib",
-  "version": "2.0.1",
-  "description": "Simple Node.js module to send commands to GlobalCache devices supporting the Unified TCP API. Should handle reconnection (if connection lost), resending (on busyIR), etc.. but not abstract away the Unified TCP API.",
+  "version": "0.1.0",
+  "description": "Global Caché communication library for devices supporting the Unified TCP API.",
   "main": "src/itach.js",
   "scripts": {
     "format": "prettier --write \"./{src,test}/**/*.js\"",
@@ -10,12 +10,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/zehnm/gc-unified-lib"
+    "url": "https://github.com/zehnm/gc-unified-lib.git"
   },
+  "homepage": "https://github.com/zehnm/gc-unified-lib",
   "keywords": [
-    "node",
-    "itach",
     "globalcache",
+    "itach",
     "ip2ir",
     "wf2ir",
     "infrared",
