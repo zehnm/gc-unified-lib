@@ -43,6 +43,10 @@ class UnifiedClient extends EventEmitter {
     });
   }
 
+  /**
+   * Change options.
+   * @param {Object<string,*>} [opts]
+   */
   setOptions(opts) {
     if (opts === undefined) {
       return;
@@ -52,6 +56,11 @@ class UnifiedClient extends EventEmitter {
     });
   }
 
+  /**
+   * Close device connection and clear any pending messages in the transfer queue.
+   *
+   * @param {Object<string,*>} [opts] new options, e.g. disabling reconnection.
+   */
   close(opts) {
     this.setOptions(opts);
     this.#queue.pause();
@@ -71,7 +80,7 @@ class UnifiedClient extends EventEmitter {
   /**
    * Connects to a device and optionally changes options before connecting.
    *
-   * @param {Object} opts An options Object (see setOptions method)
+   * @param {Object<string,*>} opts An options Object (see setOptions method)
    */
   connect(opts) {
     this.setOptions(opts);
@@ -79,6 +88,17 @@ class UnifiedClient extends EventEmitter {
     this.#reconnectSocket.start();
   }
 
+  /**
+   * Send a new request to the device and wait for a response.
+   *
+   * The message is put into the transfer queue and sent as soon as the device connection is available and any previous
+   * message has been sent. The `stopir` request is handled immediately and put in front of any pending messages.
+   *
+   * @param {string} data request message to send.
+   * @return {Promise<string, Error>} the response message from the device, or an {@link Error} if message communication
+   *         failed or an error response was returned. The error object is mostly a {@link GcError} or one of its
+   *         subclasses.
+   */
   send(data) {
     const msg = data.endsWith("\r") ? data : data + "\r";
     const priority = msg.startsWith("stopir");

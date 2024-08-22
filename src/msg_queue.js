@@ -158,6 +158,8 @@ class MessageQueue {
    * @param {number} [params.sendTimeout] request message timeout in milliseconds.
    * @param {number} [params.queueTimeout] queue timeout in milliseconds before the request needs to be sent.
    * @param {boolean} [params.priority=false] handle message as a priority message and put it at the start of the queue.
+   * @return {Promise<string, Error>} the response message from the device, or an {@link Error} if message communication
+   *         failed or an error response was returned.
    * @throws {ResponseError} if the message could not be sent, or an error response was received. For queue processing
    *   errors, the following `code` values are defined:
    *   - `QUEUE_TIMEOUT`: queue timeout expired, message could not be sent within the queue timeout.
