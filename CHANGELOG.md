@@ -9,12 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+---
+
+## 0.1.0 - 2024-08-22
+
+First release after forking from [tillbaks/node-itach](https://github.com/tillbaks/node-itach).
+
 ### Breaking changes
-- Forked from [tillbaks/node-itach](https://github.com/tillbaks/node-itach):
-  - Renamed module to `gc-unified-lib`.
-  - Rewritten message queue.
-  - Renew codebase with ES6 classes.
-  - Reset version to `0.1.0`. There might be more breaking changes in the future until functionality stabilizes for a v1 release.
+- Renamed module to `gc-unified-lib`.
+- Rewritten message queue.
+- Renew codebase with ES6 classes.
+- Reset version to `0.1.0`. There might be more breaking changes in the future until functionality stabilizes for a v1 release.
 - Update ava & sinon test framework which now require Node.js v18.18 or newer.
 
 ### Added
@@ -33,5 +38,3 @@ _Changes in the next release_
 ### Fixed
 - Handle socket response data in multiple data packages.
 - Reconnection loop with checking socket state.
-
----
