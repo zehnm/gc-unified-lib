@@ -11,6 +11,7 @@ _Changes in the next release_
 
 ### Fixed
 - Runtime error if invalid beacon message received during discovery.
+- Only return Global Cache devices in discovery.
 
 ---
 

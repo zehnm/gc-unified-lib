@@ -61,6 +61,11 @@ async function discover(duration = 60000) {
         if (!parsedBeacon) {
           return;
         }
+
+        if (parsedBeacon.get("Make") !== "GlobalCache") {
+          return;
+        }
+
         parsedBeacon.set("address", remoteInfo.address);
         const id = parsedBeacon.get("UUID");
         if (id !== undefined) {
