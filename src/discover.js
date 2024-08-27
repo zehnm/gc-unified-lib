@@ -58,6 +58,9 @@ async function discover(duration = 60000) {
       if (beacon) {
         log.msgTrace(`[${remoteInfo.address}:${remoteInfo.port}] ${beacon}`);
         const parsedBeacon = splitBeacon(beacon);
+        if (!parsedBeacon) {
+          return;
+        }
         parsedBeacon.set("address", remoteInfo.address);
         const id = parsedBeacon.get("UUID");
         if (id !== undefined) {

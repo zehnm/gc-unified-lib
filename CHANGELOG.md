@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Changes in the next release_
 
+### Fixed
+- Runtime error if invalid beacon message received during discovery.
+
 ---
 
 ## 0.1.0 - 2024-08-22
