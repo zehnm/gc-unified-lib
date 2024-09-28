@@ -1,6 +1,6 @@
 {
   "name": "gc-unified-lib",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Global Caché communication library for devices supporting the Unified TCP API.",
   "main": "src/itach.js",
   "scripts": {
